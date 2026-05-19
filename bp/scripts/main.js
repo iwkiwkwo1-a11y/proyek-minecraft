@@ -40,7 +40,7 @@ system.runInterval(() => {
         if (hiddenBoards.get(player.name)) continue;
 
         const score = getScore(player, "dompet");
-        const actionbarText = `§e§lDOMPET: §f${score} Koin §8| §bPing: 45ms §8| §aOnline: ${online}`;
+        const actionbarText = `§e§lDOMPET: §f${score} Rupiah §8| §bPing: 45ms §8| §aOnline: ${online}`;
         player.onScreenDisplay.setActionBar(actionbarText);
     }
 }, 20);
@@ -170,7 +170,7 @@ world.beforeEvents.itemUse.subscribe((event) => {
 function openGuideBook(player) {
     const form = new ActionFormData();
     form.title("§a§lBuku Panduan Server");
-    form.body("Selamat datang di Server Survival PRO!\n\n1. Gunakan Jam Menu Utama untuk membeli/menjual barang langka.\n2. Jaga baik-baik koin mu, kamu bisa mentransfer koin ke teman.\n3. Hati-hati dengan sistem Bounty! Pemain bisa menaruh harga buronan di kepalamu.\n4. Kumpulkan barang langka untuk dijual dan jadilah top global sultan server ini!\n\nSelamat bermain dan semoga sukses cuy!");
+    form.body("Selamat datang di Server Survival PRO!\n\n1. Gunakan Jam Menu Utama untuk membeli/menjual barang langka.\n2. Jaga baik-baik Rupiah mu, kamu bisa mentransfer Rupiah ke teman.\n3. Hati-hati dengan sistem Bounty! Pemain bisa menaruh harga buronan di kepalamu.\n4. Kumpulkan barang langka untuk dijual dan jadilah top global sultan server ini!\n\nSelamat bermain dan semoga sukses cuy!");
     form.button("§cTutup");
     form.show(player);
 }
@@ -180,8 +180,8 @@ function openMainMenu(player) {
     const form = new ActionFormData();
     form.title("§1[ Server Menu Utama ]");
     form.button("§e§lMenu Beli Barang\n§7Klik untuk beli kebutuhan");
-    form.button("§a§lMenu Jual Barang\n§7Pindah & Filter Koin");
-    form.button("§b§lTransfer Koin\n§7Kirim koin ke pemain lain");
+    form.button("§a§lMenu Jual Barang\n§7Pindah & Filter Rupiah");
+    form.button("§b§lTransfer Rupiah\n§7Kirim Rupiah ke pemain lain");
     form.button("§c§lSistem Bounty\n§7Pasang buronan");
     form.button("§6§lTop Sultan\n§7Peringkat pemain terkaya");
 
@@ -216,9 +216,9 @@ function openTransferMenu(player) {
 
     const playerNames = onlinePlayers.map(p => p.name);
     const form = new ModalFormData();
-    form.title("§b[ Transfer Koin ]");
+    form.title("§b[ Transfer Rupiah ]");
     form.dropdown("Pilih Pemain:", playerNames);
-    form.textField("Jumlah Koin:", "Contoh: 100");
+    form.textField("Jumlah Rupiah:", "Contoh: 100");
 
     form.show(player).then((response) => {
         if (response.canceled) return;
@@ -228,13 +228,13 @@ function openTransferMenu(player) {
         const amount = parseInt(amountStr);
 
         if (isNaN(amount) || amount <= 0) {
-            player.sendMessage("§c[System] Jumlah koin tidak valid!");
+            player.sendMessage("§c[System] Jumlah Rupiah tidak valid!");
             return;
         }
 
         const currentCoins = getScore(player, "dompet");
         if (currentCoins < amount) {
-            player.sendMessage("§c[System] Koin lu gak cukup buat transfer segitu, cuy!");
+            player.sendMessage("§c[System] Rupiah lu gak cukup buat transfer segitu, cuy!");
             return;
         }
 
@@ -250,8 +250,8 @@ function openTransferMenu(player) {
         const targetCoins = getScore(targetPlayer, "dompet");
         setScore(targetPlayer, "dompet", targetCoins + amount);
 
-        player.sendMessage(`§a[System] Berhasil mentransfer §e${amount} Koin §ake §b${targetPlayer.name}§a.`);
-        targetPlayer.sendMessage(`§a[System] Kamu menerima §e${amount} Koin §adari §b${player.name}§a.`);
+        player.sendMessage(`§a[System] Berhasil mentransfer §e${amount} Rupiah §ake §b${targetPlayer.name}§a.`);
+        targetPlayer.sendMessage(`§a[System] Kamu menerima §e${amount} Rupiah §adari §b${player.name}§a.`);
     });
 }
 
@@ -286,7 +286,7 @@ function openSetBountyMenu(player) {
     const form = new ModalFormData();
     form.title("§c[ Pasang Bounty ]");
     form.dropdown("Pilih Target Buronan:", playerNames);
-    form.textField("Harga Bounty (Koin):", "Contoh: 500");
+    form.textField("Harga Bounty (Rupiah):", "Contoh: 500");
 
     form.show(player).then((response) => {
         if (response.canceled) return;
@@ -296,13 +296,13 @@ function openSetBountyMenu(player) {
         const amount = parseInt(amountStr);
 
         if (isNaN(amount) || amount <= 0) {
-            player.sendMessage("§c[System] Jumlah koin tidak valid!");
+            player.sendMessage("§c[System] Jumlah Rupiah tidak valid!");
             return;
         }
 
         const currentCoins = getScore(player, "dompet");
         if (currentCoins < amount) {
-            player.sendMessage("§c[System] Koin lu gak cukup buat masang bounty segitu!");
+            player.sendMessage("§c[System] Rupiah lu gak cukup buat masang bounty segitu!");
             return;
         }
 
@@ -318,7 +318,7 @@ function openSetBountyMenu(player) {
             activeBounties[targetPlayerName] = { amount: amount, setter: player.name };
         }
 
-        world.sendMessage(`§c§l[BOUNTY] §r§e${player.name} §ftelah memasang harga buronan sebesar §a${amount} Koin §funtuk kepala §c${targetPlayerName}§f!`);
+        world.sendMessage(`§c§l[BOUNTY] §r§e${player.name} §ftelah memasang harga buronan sebesar §a${amount} Rupiah §funtuk kepala §c${targetPlayerName}§f!`);
     });
 }
 
@@ -332,7 +332,7 @@ function openListBountyMenu(player) {
     } else {
         let bodyText = "Daftar pemain yang sedang diincar:\n\n";
         for (const target of targets) {
-            bodyText += `§c- ${target} §f(Harga: §e${activeBounties[target].amount} Koin§f)\n`;
+            bodyText += `§c- ${target} §f(Harga: §e${activeBounties[target].amount} Rupiah§f)\n`;
         }
         form.body(bodyText);
     }
@@ -370,7 +370,7 @@ world.afterEvents.entityDie.subscribe((event) => {
             setScore(killerPlayer, "dompet", killerCoins + bountyAmount);
 
             // Announce to world
-            world.sendMessage(`§c§l[BOUNTY CLAIMED] §r§b${killerPlayer.name} §ftelah membunuh buronan §c${deadPlayerName} §fdan mendapatkan hadiah §e${bountyAmount} Koin§f!`);
+            world.sendMessage(`§c§l[BOUNTY CLAIMED] §r§b${killerPlayer.name} §ftelah membunuh buronan §c${deadPlayerName} §fdan mendapatkan hadiah §e${bountyAmount} Rupiah§f!`);
 
             // Remove bounty
             delete activeBounties[deadPlayerName];
@@ -401,9 +401,9 @@ function openTopKoinMenu(player) {
             const identity = scoreInfo.participant;
             // Only show Player identities (optional, but good for filtering fake players if any)
             if (identity.type === "Player") {
-                bodyText += `§f${i + 1}. §b${identity.displayName} §7- §e${scoreInfo.score} Koin\n`;
+                bodyText += `§f${i + 1}. §b${identity.displayName} §7- §e${scoreInfo.score} Rupiah\n`;
             } else {
-                bodyText += `§f${i + 1}. §b${identity.displayName} §7- §e${scoreInfo.score} Koin\n`;
+                bodyText += `§f${i + 1}. §b${identity.displayName} §7- §e${scoreInfo.score} Rupiah\n`;
             }
         }
 
@@ -419,7 +419,7 @@ function openBuyMenu(player) {
     const price = EconomyConfig.buyPrices["minecraft:bread"];
     const form = new ActionFormData();
     form.title("§1[ Menu Beli Roti ]");
-    form.button(`Beli Roti\n§e${price} Koin`);
+    form.button(`Beli Roti\n§e${price} Rupiah`);
 
     form.show(player).then((response) => {
         if (response.canceled) return;
@@ -430,7 +430,7 @@ function openBuyMenu(player) {
                 player.runCommandAsync(`give @s minecraft:bread 1`);
                 player.sendMessage("§a[Shop] Sukses membeli 1 Roti!");
             } else {
-                player.sendMessage("§c[Shop] Koin lu gak cukup, cuy!");
+                player.sendMessage("§c[Shop] Rupiah lu gak cukup, cuy!");
             }
         }
     });
@@ -476,7 +476,7 @@ function processSellAll(player) {
     if (itemsSold) {
         const currentCoins = getScore(player, "dompet");
         setScore(player, "dompet", currentCoins + totalEarned);
-        player.sendMessage(`§a[Shop] Berhasil menjual barang langka! Total didapat: §e${totalEarned} Koin`);
+        player.sendMessage(`§a[Shop] Berhasil menjual barang langka! Total didapat: §e${totalEarned} Rupiah`);
     }
 
     if (hasRejectedItems) {

@@ -1,6 +1,7 @@
 import { world, system, ItemStack, ItemLockMode, EnchantmentTypes } from "@minecraft/server";
 import { ActionFormData, ModalFormData } from "@minecraft/server-ui";
 import { EconomyConfig } from "./economy_config.js";
+import { getPlayerRpgData, getXpRequired, generateXpBar, applyPassiveStats, addXp, breakBlockArea, canUseActiveSkill } from "./rpg_system.js";
 
 // Initialize Objective
 system.run(() => {
@@ -39,8 +40,30 @@ system.runInterval(() => {
     for (const player of players) {
         if (hiddenBoards.get(player.name)) continue;
 
+        // Passive Stats application (runs constantly)
+        const rpgData = getPlayerRpgData(player);
+        applyPassiveStats(player, rpgData);
+
         const score = getScore(player, "dompet");
-        const actionbarText = `§e§lDOMPET: §f${score} Rupiah §8| §bPing: 45ms §8| §aOnline: ${online}`;
+        let actionbarText = `§e§lDOMPET: §f${score} Rupiah §8| §aOnline: ${online}`;
+
+        // Check if player earned XP recently (within last 3 seconds)
+        try {
+            const recentStr = player.getDynamicProperty("rpg_recent_xp");
+            if (recentStr && typeof recentStr === 'string') {
+                const recent = JSON.parse(recentStr);
+                if (Date.now() - recent.time < 3000) {
+                    const prof = recent.prof;
+                    const lv = rpgData[prof].level;
+                    const xp = rpgData[prof].xp;
+                    const req = getXpRequired(lv);
+                    const pct = req === Infinity ? "MAX" : Math.floor((xp / req) * 100) + "%";
+                    const bar = req === Infinity ? "§b||||||||||||||||||||" : generateXpBar(xp, req);
+                    actionbarText = `§e${prof.toUpperCase()} Lv.${lv} §f[${bar}§f] §a${pct}`;
+                }
+            }
+        } catch(e) {}
+
         player.onScreenDisplay.setActionBar(actionbarText);
     }
 }, 20);
@@ -184,6 +207,7 @@ function openMainMenu(player) {
     form.button("§b§lTransfer Rupiah\n§7Kirim Rupiah ke pemain lain");
     form.button("§c§lSistem Bounty\n§7Pasang buronan");
     form.button("§6§lTop Sultan\n§7Peringkat pemain terkaya");
+    form.button("§d§lMenu RPG & Skill\n§7Level & Kemampuan Aktif");
 
     form.show(player).then((response) => {
         if (response.canceled) return;
@@ -203,9 +227,138 @@ function openMainMenu(player) {
             case 4:
                 openTopKoinMenu(player);
                 break;
+            case 5:
+                openRpgMenu(player);
+                break;
         }
     });
 }
+
+function openRpgMenu(player) {
+    const rpgData = getPlayerRpgData(player);
+    const form = new ActionFormData();
+    form.title("§d[ Profil RPG & Skill ]");
+
+    let statsStr = `§fSkill Points (SP): §e${rpgData.sp}\n`;
+    statsStr += `\n§e⛏ Mining: §fLv.${rpgData.mining.level} §7(${rpgData.mining.xp}/${getXpRequired(rpgData.mining.level)} XP)\n`;
+    statsStr += `§a🪓 Woodcutting: §fLv.${rpgData.woodcutting.level} §7(${rpgData.woodcutting.xp}/${getXpRequired(rpgData.woodcutting.level)} XP)\n`;
+    statsStr += `§c⚔ Slayer: §fLv.${rpgData.slayer.level} §7(${rpgData.slayer.xp}/${getXpRequired(rpgData.slayer.level)} XP)\n`;
+
+    statsStr += `\n§bAktif Skill (Max 2): \n`;
+    if (rpgData.equippedSkills.length === 0) {
+        statsStr += "§7- Belum ada yang di-equip\n";
+    } else {
+        for (const skill of rpgData.equippedSkills) {
+            statsStr += `§b- ${skill.toUpperCase()}\n`;
+        }
+    }
+
+    form.body(statsStr);
+
+    form.button("§eSkill Tree (Beli Skill)\n§7Tukar SP dengan Skill Baru");
+    form.button("§aEquip Skill Aktif\n§7Pilih 2 skill andalanmu");
+    form.button("§cKembali ke Menu Utama");
+
+    form.show(player).then((res) => {
+        if (res.canceled) return;
+        if (res.selection === 0) openSkillTreeMenu(player);
+        else if (res.selection === 1) openEquipSkillMenu(player);
+        else if (res.selection === 2) openMainMenu(player);
+    });
+}
+
+const AVAILABLE_SKILLS = [
+    { id: "vein_miner", name: "⛏ Vein Miner (Mining)", desc: "Hancurkan 3x3x3 blok batu/ore sekaligus dengan jongkok.", cost: 10 },
+    { id: "timber", name: "🪓 Timber (Woodcutting)", desc: "Tebang 3x3x3 blok kayu sekaligus dengan jongkok.", cost: 10 },
+    { id: "lifesteal", name: "⚔ Lifesteal (Slayer)", desc: "Menyembuhkan HP saat membunuh monster dengan jongkok.", cost: 15 }
+];
+
+import { savePlayerRpgData } from "./rpg_system.js";
+
+function openSkillTreeMenu(player) {
+    const rpgData = getPlayerRpgData(player);
+    const form = new ActionFormData();
+    form.title("§e[ Beli Skill ]");
+    form.body(`Sisa Skill Point (SP): §e${rpgData.sp}\n\nPilih skill yang ingin kamu pelajari:`);
+
+    for (const skill of AVAILABLE_SKILLS) {
+        if (rpgData.unlockedSkills.includes(skill.id)) {
+            form.button(`§a${skill.name}\n§7[Sudah Dimiliki]`);
+        } else {
+            form.button(`§c${skill.name}\n§7[Harga: ${skill.cost} SP]`);
+        }
+    }
+    form.button("§cKembali");
+
+    form.show(player).then((res) => {
+        if (res.canceled) return;
+        if (res.selection === AVAILABLE_SKILLS.length) {
+            openRpgMenu(player);
+            return;
+        }
+
+        const selected = AVAILABLE_SKILLS[res.selection];
+        if (rpgData.unlockedSkills.includes(selected.id)) {
+            player.sendMessage(`§c[RPG] Kamu sudah memiliki skill ${selected.name}!`);
+            openSkillTreeMenu(player);
+            return;
+        }
+
+        if (rpgData.sp < selected.cost) {
+            player.sendMessage(`§c[RPG] Skill Point kamu tidak cukup untuk membeli ${selected.name}!`);
+            openSkillTreeMenu(player);
+            return;
+        }
+
+        // Purchase logic
+        rpgData.sp -= selected.cost;
+        rpgData.unlockedSkills.push(selected.id);
+        savePlayerRpgData(player, rpgData);
+        player.sendMessage(`§a[RPG] Berhasil mempelajari skill ${selected.name}!`);
+        openSkillTreeMenu(player);
+    });
+}
+
+function openEquipSkillMenu(player) {
+    const rpgData = getPlayerRpgData(player);
+
+    if (rpgData.unlockedSkills.length === 0) {
+        player.sendMessage("§c[RPG] Kamu belum mempelajari skill aktif apapun dari Skill Tree!");
+        return;
+    }
+
+    const form = new ModalFormData();
+    form.title("§a[ Equip Skill Aktif ]");
+
+    // We will use Toggles for each unlocked skill.
+    // Player can toggle on/off. Validation happens on submit.
+    for (const skillId of rpgData.unlockedSkills) {
+        const skillInfo = AVAILABLE_SKILLS.find(s => s.id === skillId);
+        const isEquipped = rpgData.equippedSkills.includes(skillId);
+        form.toggle(skillInfo.name, isEquipped);
+    }
+
+    form.show(player).then((res) => {
+        if (res.canceled) return;
+
+        let newEquipped = [];
+        for (let i = 0; i < rpgData.unlockedSkills.length; i++) {
+            if (res.formValues[i] === true) {
+                newEquipped.push(rpgData.unlockedSkills[i]);
+            }
+        }
+
+        if (newEquipped.length > 2) {
+            player.sendMessage("§c[RPG] Kamu hanya bisa meng-equip maksimal 2 Skill Aktif secara bersamaan!");
+            return;
+        }
+
+        rpgData.equippedSkills = newEquipped;
+        savePlayerRpgData(player, rpgData);
+        player.sendMessage("§a[RPG] Skill aktif berhasil diperbarui!");
+    });
+}
+
 
 function openTransferMenu(player) {
     const onlinePlayers = world.getAllPlayers().filter(p => p.name !== player.name);
@@ -345,7 +498,53 @@ function openListBountyMenu(player) {
     });
 }
 
-// Handle Bounty claims on Entity death
+// RPG Triggers: Block Breaking (Mining & Woodcutting)
+world.afterEvents.playerBreakBlock.subscribe((event) => {
+    const { player, brokenBlockPermutation, block } = event;
+    const typeId = brokenBlockPermutation.type.id;
+
+    // Categorize block types
+    const isWood = typeId.includes("log") || typeId.includes("stem") || typeId.includes("wood");
+    const isOre = typeId.includes("ore") || typeId.includes("stone") || typeId.includes("basalt") || typeId.includes("granite") || typeId.includes("diorite") || typeId.includes("andesite") || typeId.includes("netherrack");
+
+    const rpgData = getPlayerRpgData(player);
+
+    if (isWood) {
+        // Base XP: 5 per log
+        addXp(player, "woodcutting", 5);
+
+        // Active Skill: Timber (Breaks a 3x3x3 area of logs if sneaking, equipped, and off cooldown)
+        if (player.isSneaking && rpgData.equippedSkills.includes("timber")) {
+            if (canUseActiveSkill(player.name, "timber", 5000)) { // 5 second cooldown
+                const broken = breakBlockArea(player, block, 1, typeId);
+                if (broken > 0) {
+                    player.sendMessage(`§a[Skill] §fTimber aktif! Menghancurkan §e${broken} balok kayu§f.`);
+                    addXp(player, "woodcutting", broken * 5); // Give XP for the destroyed logs too
+                }
+            } else {
+                player.onScreenDisplay.setActionBar("§cSkill 'Timber' masih cooldown!");
+            }
+        }
+    } else if (isOre) {
+        // Base XP: 3 per stone/ore
+        addXp(player, "mining", 3);
+
+        // Active Skill: Vein Miner (Breaks a 3x3x3 area of ores if sneaking, equipped, and off cooldown)
+        if (player.isSneaking && rpgData.equippedSkills.includes("vein_miner")) {
+            if (canUseActiveSkill(player.name, "vein_miner", 10000)) { // 10 second cooldown
+                const broken = breakBlockArea(player, block, 1, typeId);
+                if (broken > 0) {
+                    player.sendMessage(`§a[Skill] §fVein Miner aktif! Menghancurkan §e${broken} blok mineral§f.`);
+                    addXp(player, "mining", broken * 3);
+                }
+            } else {
+                player.onScreenDisplay.setActionBar("§cSkill 'Vein Miner' masih cooldown!");
+            }
+        }
+    }
+});
+
+// Handle RPG Slayer XP and Bounty claims on Entity death
 world.afterEvents.entityDie.subscribe((event) => {
     const deadEntity = event.deadEntity;
     const damageSource = event.damageSource;
@@ -359,6 +558,22 @@ world.afterEvents.entityDie.subscribe((event) => {
     // Check if there is a killer and the killer is a player
     if (killer && killer.typeId === "minecraft:player") {
         const killerPlayer = killer;
+
+        // RPG Slayer XP logic
+        const isMonster = !deadEntity.typeId.includes("player") && !deadEntity.typeId.includes("item");
+        if (isMonster) {
+            // Base XP: 10 per mob kill
+            addXp(killerPlayer, "slayer", 10);
+
+            const rpgData = getPlayerRpgData(killerPlayer);
+            // Active Skill: Lifesteal (Heals player if sneaking, equipped, and off cooldown)
+            if (killerPlayer.isSneaking && rpgData.equippedSkills.includes("lifesteal")) {
+                if (canUseActiveSkill(killerPlayer.name, "lifesteal", 15000)) { // 15s cooldown
+                    killerPlayer.addEffect("instant_health", 1, { amplifier: 0, showParticles: true });
+                    killerPlayer.sendMessage("§a[Skill] §fLifesteal aktif! HP dipulihkan.");
+                }
+            }
+        }
 
         // Check if the dead player had a bounty
         if (activeBounties[deadPlayerName]) {

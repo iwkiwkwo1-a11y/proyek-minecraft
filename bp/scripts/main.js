@@ -2,6 +2,7 @@ import { world, system, ItemStack, ItemLockMode, EnchantmentTypes } from "@minec
 import { ActionFormData, ModalFormData } from "@minecraft/server-ui";
 import { EconomyConfig } from "./economy_config.js";
 import { getPlayerRpgData, getXpRequired, generateXpBar, applyPassiveStats, addXp, breakBlockArea, canUseActiveSkill } from "./rpg_system.js";
+import { formatRupiah } from "./utils.js";
 
 // Initialize Objective
 system.run(() => {
@@ -90,7 +91,7 @@ system.runInterval(() => {
 
         const score = getScore(player, "dompet");
         const coreScore = getScore(player, "core");
-        let actionbarText = `§e§lDOMPET: §f${score} Rupiah §8| §b§lCORE: §f${coreScore} §8| §aOnline: ${online}`;
+        let actionbarText = `§e§lDOMPET: §f${formatRupiah(score)} §8| §b§lCORE: §f${coreScore} §8| §aOnline: ${online}`;
 
         // Check if player earned XP recently (within last 3 seconds)
         try {
@@ -238,7 +239,7 @@ world.beforeEvents.itemUse.subscribe((event) => {
 function openGuideBook(player) {
     const form = new ActionFormData();
     form.title("§a§lBuku Panduan Server");
-    form.body("Selamat datang di Server Survival PRO!\n\n1. Gunakan Jam Menu Utama untuk membeli/menjual barang langka.\n2. Jaga baik-baik Rupiah mu, kamu bisa mentransfer Rupiah ke teman.\n3. Hati-hati dengan sistem Bounty! Pemain bisa menaruh harga buronan di kepalamu.\n4. Kumpulkan barang langka untuk dijual dan jadilah top global sultan server ini!\n\nSelamat bermain dan semoga sukses cuy!");
+    form.body("Selamat datang di Server Survival PRO!\n\n§e[1] Toko Dinamis & Jual Barang§f\nJam Menu Utama memutar 30 barang acak (ada barang OP juga!) setiap 1 menit. Jual hasil panen dan tambangmu untuk mendapatkan Rupiah.\n\n§e[2] RPG & Leveling§f\nDapatkan XP dengan nambang (Mining), nebang pohon (Woodcutting), dan bunuh monster (Slayer). Kumpulkan Skill Point (SP) untuk beli skill aktif di Menu RPG!\n\n§e[3] Gacha & Core§f\nTukar Rupiah menjadi Core. Gunakan Core untuk gacha Pasif Dewa permanen, atau gacha sihir kekuatan pada senjata utamamu!\n\n§e[4] Kelola Skill§f\nKamu maksimal hanya bisa memakai 2 Skill Aktif RPG dan 3 Pasif Gacha secara bersamaan. Atur kombinasimu di menu 'Kelola Semua Skill'.\n\nSelamat bermain dan semoga sukses, cuy!");
     form.button("§cTutup");
     form.show(player);
 }
@@ -317,59 +318,18 @@ function openRpgMenu(player) {
     form.body(statsStr);
 
     form.button("§eSkill Tree (Beli Skill)\n§7Tukar SP dengan Skill Baru");
-    form.button("§aEquip Skill Aktif\n§7Kelola 2 skill andalanmu");
-    form.button("§5Equip Pasif Gacha\n§7Kelola 3 pasif dewamu");
+    form.button("§aKelola Semua Skill\n§7Pasang Skill & Pasif Dewamu");
     form.button("§cKembali ke Menu Utama");
 
     form.show(player).then((res) => {
         if (res.canceled) return;
         if (res.selection === 0) openSkillTreeMenu(player);
-        else if (res.selection === 1) openEquipSkillMenu(player);
-        else if (res.selection === 2) openEquipPassiveMenu(player);
-        else if (res.selection === 3) openMainMenu(player);
+        else if (res.selection === 1) openEquipUnifiedMenu(player);
+        else if (res.selection === 2) openMainMenu(player);
     });
 }
 
 import { PASSIVE_POOL } from "./gacha_system.js";
-
-function openEquipPassiveMenu(player) {
-    const rpgData = getPlayerRpgData(player);
-    const unlockedPassives = rpgData.unlockedGachaPassives || [];
-
-    if (unlockedPassives.length === 0) {
-        player.sendMessage("§c[RPG] Kamu belum memiliki Pasif Dewa dari Gacha!");
-        return;
-    }
-
-    const form = new ModalFormData();
-    form.title("§5[ Equip Pasif Dewa ]");
-
-    for (const passiveId of unlockedPassives) {
-        const passiveInfo = PASSIVE_POOL.find(p => p.id === passiveId);
-        const isEquipped = (rpgData.equippedGachaPassives || []).includes(passiveId);
-        form.toggle(passiveInfo ? passiveInfo.name : passiveId, isEquipped);
-    }
-
-    form.show(player).then((res) => {
-        if (res.canceled) return;
-
-        let newEquipped = [];
-        for (let i = 0; i < unlockedPassives.length; i++) {
-            if (res.formValues[i] === true) {
-                newEquipped.push(unlockedPassives[i]);
-            }
-        }
-
-        if (newEquipped.length > 3) {
-            player.sendMessage("§c[RPG] Kamu hanya bisa meng-equip maksimal 3 Pasif Dewa secara bersamaan!");
-            return;
-        }
-
-        rpgData.equippedGachaPassives = newEquipped;
-        savePlayerRpgData(player, rpgData);
-        player.sendMessage("§a[RPG] Pasif Dewa berhasil diperbarui!");
-    });
-}
 
 const AVAILABLE_SKILLS = [
     { id: "ore_excavation", name: "⛏ Ore Excavation (Mining)", desc: "Hancurkan 3x3x3 blok batu/ore sekaligus dengan jongkok.", cost: 15 },
@@ -423,43 +383,75 @@ function openSkillTreeMenu(player) {
     });
 }
 
-function openEquipSkillMenu(player) {
+function openEquipUnifiedMenu(player) {
     const rpgData = getPlayerRpgData(player);
+    const unlockedActives = rpgData.unlockedSkills || [];
+    const unlockedPassives = rpgData.unlockedGachaPassives || [];
 
-    if (rpgData.unlockedSkills.length === 0) {
-        player.sendMessage("§c[RPG] Kamu belum mempelajari skill aktif apapun dari Skill Tree!");
+    if (unlockedActives.length === 0 && unlockedPassives.length === 0) {
+        player.sendMessage("§c[RPG] Kamu belum memiliki Skill Aktif (dari Level) maupun Pasif Dewa (dari Gacha)!");
         return;
     }
 
     const form = new ModalFormData();
-    form.title("§a[ Equip Skill Aktif ]");
+    form.title("§a[ Kelola Skill & Pasif ]");
 
-    // We will use Toggles for each unlocked skill.
-    // Player can toggle on/off. Validation happens on submit.
-    for (const skillId of rpgData.unlockedSkills) {
+    // 1. Add toggles for Active Skills
+    for (const skillId of unlockedActives) {
         const skillInfo = AVAILABLE_SKILLS.find(s => s.id === skillId);
         const isEquipped = rpgData.equippedSkills.includes(skillId);
-        form.toggle(skillInfo.name, isEquipped);
+        form.toggle(`§b(Aktif) §r${skillInfo ? skillInfo.name : skillId}`, isEquipped);
+    }
+
+    // 2. Add toggles for Gacha Passives
+    for (const passiveId of unlockedPassives) {
+        const passiveInfo = PASSIVE_POOL.find(p => p.id === passiveId);
+        const isEquipped = (rpgData.equippedGachaPassives || []).includes(passiveId);
+        form.toggle(`§d(Pasif) §r${passiveInfo ? passiveInfo.name : passiveId}`, isEquipped);
     }
 
     form.show(player).then((res) => {
         if (res.canceled) return;
 
-        let newEquipped = [];
-        for (let i = 0; i < rpgData.unlockedSkills.length; i++) {
-            if (res.formValues[i] === true) {
-                newEquipped.push(rpgData.unlockedSkills[i]);
+        let newActiveEquipped = [];
+        let newPassiveEquipped = [];
+
+        let currentIndex = 0;
+
+        // Parse Active Skills responses
+        for (let i = 0; i < unlockedActives.length; i++) {
+            if (res.formValues[currentIndex] === true) {
+                newActiveEquipped.push(unlockedActives[i]);
             }
+            currentIndex++;
         }
 
-        if (newEquipped.length > 2) {
-            player.sendMessage("§c[RPG] Kamu hanya bisa meng-equip maksimal 2 Skill Aktif secara bersamaan!");
-            return;
+        // Parse Passive Skills responses
+        for (let i = 0; i < unlockedPassives.length; i++) {
+            if (res.formValues[currentIndex] === true) {
+                newPassiveEquipped.push(unlockedPassives[i]);
+            }
+            currentIndex++;
         }
 
-        rpgData.equippedSkills = newEquipped;
-        savePlayerRpgData(player, rpgData);
-        player.sendMessage("§a[RPG] Skill aktif berhasil diperbarui!");
+        let hasError = false;
+
+        if (newActiveEquipped.length > 2) {
+            player.sendMessage("§c[RPG] Kamu melebihi batas! Maksimal 2 Skill Aktif.");
+            hasError = true;
+        }
+
+        if (newPassiveEquipped.length > 3) {
+            player.sendMessage("§c[RPG] Kamu melebihi batas! Maksimal 3 Pasif Dewa.");
+            hasError = true;
+        }
+
+        if (!hasError) {
+            rpgData.equippedSkills = newActiveEquipped;
+            rpgData.equippedGachaPassives = newPassiveEquipped;
+            savePlayerRpgData(player, rpgData);
+            player.sendMessage("§a[RPG] Susunan Skill & Pasif Dewa berhasil diperbarui!");
+        }
     });
 }
 
@@ -507,8 +499,8 @@ function openTransferMenu(player) {
         const targetCoins = getScore(targetPlayer, "dompet");
         setScore(targetPlayer, "dompet", targetCoins + amount);
 
-        player.sendMessage(`§a[System] Berhasil mentransfer §e${amount} Rupiah §ake §b${targetPlayer.name}§a.`);
-        targetPlayer.sendMessage(`§a[System] Kamu menerima §e${amount} Rupiah §adari §b${player.name}§a.`);
+        player.sendMessage(`§a[System] Berhasil mentransfer §e${formatRupiah(amount)} §ake §b${targetPlayer.name}§a.`);
+        targetPlayer.sendMessage(`§a[System] Kamu menerima §e${formatRupiah(amount)} §adari §b${player.name}§a.`);
     });
 }
 
@@ -591,7 +583,7 @@ function openSetBountyMenu(player) {
         }
         saveBounties(activeBounties);
 
-        world.sendMessage(`§c§l[BOUNTY] §r§e${player.name} §ftelah memasang harga buronan sebesar §a${amount} Rupiah §funtuk kepala §c${targetPlayerName}§f!`);
+        world.sendMessage(`§c§l[BOUNTY] §r§e${player.name} §ftelah memasang harga buronan sebesar §a${formatRupiah(amount)} §funtuk kepala §c${targetPlayerName}§f!`);
     });
 }
 
@@ -605,7 +597,7 @@ function openListBountyMenu(player) {
     } else {
         let bodyText = "Daftar pemain yang sedang diincar:\n\n";
         for (const target of targets) {
-            bodyText += `§c- ${target} §f(Harga: §e${activeBounties[target].amount} Rupiah§f)\n`;
+            bodyText += `§c- ${target} §f(Harga: §e${formatRupiah(activeBounties[target].amount)}§f)\n`;
         }
         form.body(bodyText);
     }
@@ -703,7 +695,7 @@ world.afterEvents.entityDie.subscribe((event) => {
                 setScore(killerPlayer, "dompet", killerCoins + bountyAmount);
 
                 // Announce to world
-                world.sendMessage(`§c§l[BOUNTY CLAIMED] §r§b${killerPlayer.name} §ftelah membunuh buronan §c${deadPlayerName} §fdan mendapatkan hadiah §e${bountyAmount} Rupiah§f!`);
+                world.sendMessage(`§c§l[BOUNTY CLAIMED] §r§b${killerPlayer.name} §ftelah membunuh buronan §c${deadPlayerName} §fdan mendapatkan hadiah §e${formatRupiah(bountyAmount)}§f!`);
 
                 // Remove bounty and save state
                 delete activeBounties[deadPlayerName];
@@ -736,9 +728,9 @@ function openTopKoinMenu(player) {
             const identity = scoreInfo.participant;
             // Only show Player identities (optional, but good for filtering fake players if any)
             if (identity.type === "Player") {
-                bodyText += `§f${i + 1}. §b${identity.displayName} §7- §e${scoreInfo.score} Rupiah\n`;
+                bodyText += `§f${i + 1}. §b${identity.displayName} §7- §e${formatRupiah(scoreInfo.score)}\n`;
             } else {
-                bodyText += `§f${i + 1}. §b${identity.displayName} §7- §e${scoreInfo.score} Rupiah\n`;
+                bodyText += `§f${i + 1}. §b${identity.displayName} §7- §e${formatRupiah(scoreInfo.score)}\n`;
             }
         }
 
@@ -769,11 +761,11 @@ function openBuyMenu(player) {
 
     for (const item of snapshot) {
         const displayName = formatItemName(item.id);
-        const priceStr = item.price.toLocaleString("id-ID");
+        const priceStr = formatRupiah(item.price);
         if (item.isOP) {
-            form.button(`§d§l[OP] ${displayName}§r\n§eRp${priceStr}`);
+            form.button(`§d§l[OP] ${displayName}§r\n§e${priceStr}`);
         } else {
-            form.button(`§f${displayName}\n§eRp${priceStr}`);
+            form.button(`§f${displayName}\n§e${priceStr}`);
         }
     }
     form.button("§cKembali");
@@ -793,10 +785,10 @@ function openBuyMenu(player) {
 function openBuyAmountMenu(player, itemData) {
     const form = new ModalFormData();
     const displayName = formatItemName(itemData.id);
-    const priceStr = itemData.price.toLocaleString("id-ID");
+    const priceStr = formatRupiah(itemData.price);
 
     form.title("§a[ Beli Barang ]");
-    form.slider(`Berapa banyak §e${displayName} §fyang ingin kamu beli?\n§7Harga Satuan: Rp${priceStr}`, 1, 64, 1, 1);
+    form.slider(`Berapa banyak §e${displayName} §fyang ingin kamu beli?\n§7Harga Satuan: ${priceStr}`, 1, 64, 1, 1);
 
     form.show(player).then((response) => {
         if (response.canceled) return;
@@ -838,9 +830,9 @@ function openBuyAmountMenu(player, itemData) {
                 remaining -= toGive;
             }
 
-            player.sendMessage(`§a[Shop] Sukses membeli §e${amount}x ${displayName} §aseharga §eRp${totalCost.toLocaleString("id-ID")}!`);
+            player.sendMessage(`§a[Shop] Sukses membeli §e${amount}x ${displayName} §aseharga §e${formatRupiah(totalCost)}!`);
         } else {
-            player.sendMessage(`§c[Shop] Rupiah lu gak cukup cuy! Butuh Rp${totalCost.toLocaleString("id-ID")}.`);
+            player.sendMessage(`§c[Shop] Rupiah lu gak cukup cuy! Butuh ${formatRupiah(totalCost)}.`);
         }
     });
 }
@@ -885,7 +877,7 @@ function processSellAll(player) {
     if (itemsSold) {
         const currentCoins = getScore(player, "dompet");
         setScore(player, "dompet", currentCoins + totalEarned);
-        player.sendMessage(`§a[Shop] Berhasil menjual barang langka! Total didapat: §e${totalEarned} Rupiah`);
+        player.sendMessage(`§a[Shop] Berhasil menjual barang langka! Total didapat: §e${formatRupiah(totalEarned)}`);
     }
 
     if (hasRejectedItems) {

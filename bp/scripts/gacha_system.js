@@ -53,6 +53,7 @@ export const PASSIVE_POOL = [
 ];
 
 import { getPlayerRpgData, savePlayerRpgData } from "./rpg_system.js";
+import { formatRupiah } from "./utils.js";
 
 export function openPassiveGacha(player) {
     const objCore = world.scoreboard.getObjective("core");
@@ -99,7 +100,7 @@ export function openPassiveGacha(player) {
 function openConvertMenu(player) {
     const form = new ModalFormData();
     form.title("§b[ Tukar Core ]");
-    form.slider(`Berapa Core yang ingin dibeli?\n§7Harga: Rp${CORE_PRICE.toLocaleString("id-ID")} / Core`, 1, 64, 1, 1);
+    form.slider(`Berapa Core yang ingin dibeli?\n§7Harga: ${formatRupiah(CORE_PRICE)} / Core`, 1, 64, 1, 1);
 
     form.show(player).then(res => {
         if (res.canceled) return;
@@ -122,9 +123,9 @@ function openConvertMenu(player) {
             try { currentCore = objCore.getScore(player) || 0; } catch (e) {}
             objCore.setScore(player, currentCore + amount);
 
-            player.sendMessage(`§a[System] Berhasil membeli §b${amount} Core §aseharga §eRp${cost.toLocaleString("id-ID")}!`);
+            player.sendMessage(`§a[System] Berhasil membeli §b${amount} Core §aseharga §e${formatRupiah(cost)}!`);
         } else {
-            player.sendMessage(`§c[System] Rupiah kamu tidak cukup! Butuh Rp${cost.toLocaleString("id-ID")}.`);
+            player.sendMessage(`§c[System] Rupiah kamu tidak cukup! Butuh ${formatRupiah(cost)}.`);
         }
     });
 }

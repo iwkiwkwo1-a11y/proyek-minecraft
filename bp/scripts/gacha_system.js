@@ -52,7 +52,9 @@ export const PASSIVE_POOL = [
     { id: "agility", name: "💨 Agility", desc: "Speed & Jump Boost Permanen" },
     { id: "titans_grip", name: "⚔ Titan's Grip", desc: "Strength Permanen" },
     { id: "vitality", name: "❤ Vitality", desc: "Health Boost Permanen" },
-    { id: "regeneration", name: "✨ Vigor", desc: "Regen HP Perlahan" }
+    { id: "regeneration", name: "✨ Vigor", desc: "Regen HP Perlahan" },
+    { id: "phoenix_blood", name: "🔥 Phoenix Blood (Legendary)", desc: "Regen deras saat HP sekarat" },
+    { id: "adrenaline", name: "⚡ Adrenaline (Legendary)", desc: "Speed gila saat HP sekarat" }
 ];
 
 export function openPassiveGacha(player) {

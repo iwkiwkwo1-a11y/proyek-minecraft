@@ -920,7 +920,7 @@ world.afterEvents.entityHitEntity.subscribe((event) => {
         }
     } else if (effect === "fire_aspect_x") {
         if (Math.random() < 0.15) {
-            target.dimension.runCommandAsync(`execute as "${target.id}" at @s run fill ~ ~ ~ ~ ~ ~ fire keep`);
+            target.setOnFire(10, true);
         }
     } else if (effect === "abyssal_wither") {
         if (Math.random() < 0.10) {
@@ -937,6 +937,26 @@ world.afterEvents.entityHitEntity.subscribe((event) => {
         if (Math.random() < 0.10) {
             attacker.addEffect("instant_health", 1, { amplifier: 1, showParticles: true });
             attacker.dimension.spawnParticle("minecraft:heart_particle", attacker.location);
+        }
+    } else if (effect === "sonic_boom") {
+        if (Math.random() < 0.15) {
+            target.applyKnockback(target.location.x - attacker.location.x, target.location.z - attacker.location.z, 3.0, 0.5);
+            target.dimension.spawnParticle("minecraft:knockback_roar_particle", target.location);
+        }
+    } else if (effect === "blindness_strike") {
+        if (Math.random() < 0.15) {
+            target.addEffect("blindness", 60, { amplifier: 0, showParticles: true });
+        }
+    } else if (effect === "levitation_hit") {
+        if (Math.random() < 0.10) {
+            target.addEffect("levitation", 40, { amplifier: 9, showParticles: true });
+        }
+    } else if (effect === "explosive_blow") {
+        if (Math.random() < 0.05) {
+            target.dimension.runCommandAsync(`particle minecraft:huge_explosion_emitter ${target.location.x} ${target.location.y} ${target.location.z}`);
+            target.dimension.runCommandAsync(`playsound random.explode @a[x=${target.location.x},y=${target.location.y},z=${target.location.z},r=10] 1.0 1.0`);
+            // Custom damage bypass trick
+            target.addEffect("instant_damage", 1, { amplifier: 1, showParticles: false });
         }
     }
 });

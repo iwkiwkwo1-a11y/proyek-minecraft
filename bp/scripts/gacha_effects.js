@@ -3,15 +3,18 @@
 export const WEAPON_EFFECTS = [
     { id: "poison_1", name: "Venom Strike", type: "weapon", rarity: "Rare", desc: "Peluang meracuni target." },
     { id: "frostbite", name: "Frostbite", type: "weapon", rarity: "Rare", desc: "Peluang slow dan weakness." },
+    { id: "sonic_boom", name: "Sonic Boom", type: "weapon", rarity: "Rare", desc: "Knockback ekstrim ke target." },
     { id: "fire_aspect_x", name: "Hellfire", type: "weapon", rarity: "Epic", desc: "Membakar musuh parah." },
     { id: "abyssal_wither", name: "Abyssal Wither", type: "weapon", rarity: "Epic", desc: "Ledakan area wither." },
+    { id: "blindness_strike", name: "Shadow Strike", type: "weapon", rarity: "Epic", desc: "Membutakan musuh sementara." },
+    { id: "levitation_hit", name: "Gravity Smash", type: "weapon", rarity: "Epic", desc: "Menerbangkan musuh ke udara." },
     { id: "thunderous_smite", name: "Thunderous Smite", type: "weapon", rarity: "Legendary", desc: "Sambar petir mematikan." },
     { id: "vampiric", name: "Vampiric Touch", type: "weapon", rarity: "Legendary", desc: "Lifesteal deras." },
-    // Add many more later in main implementation
+    { id: "explosive_blow", name: "Explosive Blow", type: "weapon", rarity: "Legendary", desc: "Ledakan area saat memukul." }
 ];
 
 export const HELMET_EFFECTS = [
-    { id: "night_owl", name: "Night Owl", type: "helmet", rarity: "Rare", desc: "Night Vision Permanen." },
+    { id: "clear_mind", name: "Clear Mind", type: "helmet", rarity: "Rare", desc: "Mencegah efek kebutaan." },
     { id: "aqua_lung", name: "Gills of Atlantis", type: "helmet", rarity: "Epic", desc: "Water Breathing Permanen." },
     { id: "third_eye", name: "Third Eye", type: "helmet", rarity: "Legendary", desc: "Night Vision & Glowing Mobs." }
 ];
@@ -19,13 +22,13 @@ export const HELMET_EFFECTS = [
 export const CHEST_EFFECTS = [
     { id: "iron_skin", name: "Iron Skin", type: "chest", rarity: "Rare", desc: "Resistance 1." },
     { id: "turtle_shell", name: "Turtle Shell", type: "chest", rarity: "Epic", desc: "Resistance 2 & Slowness." },
-    { id: "dragon_scale", name: "Dragon Scale", type: "chest", rarity: "Legendary", desc: "Resistance 3 & Fire Resist." }
+    { id: "troll_blood", name: "Troll Blood", type: "chest", rarity: "Legendary", desc: "Regenerasi HP 1 Permanen." }
 ];
 
 export const LEG_EFFECTS = [
     { id: "sturdy_legs", name: "Sturdy", type: "legs", rarity: "Rare", desc: "Sedikit extra HP." },
-    { id: "tank_legs", name: "Behemoth", type: "legs", rarity: "Epic", desc: "Extra HP menengah." },
-    { id: "colossus", name: "Colossus", type: "legs", rarity: "Legendary", desc: "Health Boost Maksimal." }
+    { id: "tank_legs", name: "Behemoth", type: "legs", rarity: "Epic", desc: "Extra HP menengah (Boost 1)." },
+    { id: "colossus", name: "Colossus", type: "legs", rarity: "Legendary", desc: "Max Health Boost (Boost 2)." }
 ];
 
 export const BOOT_EFFECTS = [

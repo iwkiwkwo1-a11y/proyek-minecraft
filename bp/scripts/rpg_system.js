@@ -149,11 +149,24 @@ export function applyPassiveStats(player, rpgData) {
         }
 
         if (passives.includes("vitality")) {
-            player.addEffect("health_boost", 30, { amplifier: 2, showParticles: false }); // Health Boost 3
+            player.addEffect("health_boost", 30, { amplifier: 1, showParticles: false }); // Nerfed: Boost 2
         }
 
         if (passives.includes("regeneration")) {
             player.addEffect("regeneration", 60, { amplifier: 0, showParticles: false }); // Regen 1
+        }
+
+        // Dynamic Health Triggers
+        const hpComponent = player.getComponent("health");
+        if (hpComponent) {
+            const isLowHp = hpComponent.currentValue <= (hpComponent.effectiveMax / 3); // Under 33% HP
+
+            if (isLowHp && passives.includes("phoenix_blood")) {
+                player.addEffect("regeneration", 60, { amplifier: 2, showParticles: true }); // Regen 3
+            }
+            if (isLowHp && passives.includes("adrenaline")) {
+                player.addEffect("speed", 60, { amplifier: 2, showParticles: true }); // Speed 3
+            }
         }
 
         // --- Equipment Gacha Passives (Armor & Tools in hand) ---
@@ -169,22 +182,22 @@ export function applyPassiveStats(player, rpgData) {
             const checkEq = (item) => {
                 if (!item) return;
                 const eff = item.getDynamicProperty("gacha_effect");
-                if (eff === "night_owl" || eff === "third_eye") player.addEffect("night_vision", 300, { amplifier: 0, showParticles: false });
+                if (eff === "clear_mind") player.removeEffect("blindness");
                 if (eff === "aqua_lung") player.addEffect("water_breathing", 60, { amplifier: 0, showParticles: false });
+                if (eff === "third_eye") player.addEffect("night_vision", 300, { amplifier: 0, showParticles: false });
 
                 if (eff === "iron_skin") player.addEffect("resistance", 30, { amplifier: 0, showParticles: false });
                 if (eff === "turtle_shell") {
                     player.addEffect("resistance", 30, { amplifier: 1, showParticles: false });
                     player.addEffect("slowness", 30, { amplifier: 0, showParticles: false });
                 }
-                if (eff === "dragon_scale") {
-                    player.addEffect("resistance", 30, { amplifier: 2, showParticles: false });
-                    player.addEffect("fire_resistance", 30, { amplifier: 0, showParticles: false });
+                if (eff === "troll_blood") {
+                    player.addEffect("regeneration", 60, { amplifier: 0, showParticles: false });
                 }
 
                 if (eff === "sturdy_legs") player.addEffect("health_boost", 30, { amplifier: 0, showParticles: false });
                 if (eff === "tank_legs") player.addEffect("health_boost", 30, { amplifier: 1, showParticles: false });
-                if (eff === "colossus") player.addEffect("health_boost", 30, { amplifier: 3, showParticles: false });
+                if (eff === "colossus") player.addEffect("health_boost", 30, { amplifier: 2, showParticles: false }); // Nerfed max to amp 2
 
                 if (eff === "swift_step") player.addEffect("speed", 30, { amplifier: 0, showParticles: false });
                 if (eff === "frog_jump") player.addEffect("jump_boost", 30, { amplifier: 1, showParticles: false });

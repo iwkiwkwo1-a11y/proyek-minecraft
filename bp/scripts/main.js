@@ -319,17 +319,27 @@ function openRpgMenu(player) {
         }
     }
 
+    const is3x3Enabled = rpgData.enable3x3 === true;
+    statsStr += `\n§fStatus Mode 3x3: ${is3x3Enabled ? "§aNYALA" : "§cMATI"}`;
+
     form.body(statsStr);
 
     form.button("§eSkill Tree (Beli Skill)\n§7Tukar SP dengan Skill Baru");
     form.button("§aKelola Semua Skill\n§7Pasang Skill & Pasif Dewamu");
+    form.button(`§bMode Hancur 3x3: ${is3x3Enabled ? "MATIKAN" : "NYALAKAN"}\n§7Mencegah hancurnya rumah`);
     form.button("§cKembali ke Menu Utama");
 
     form.show(player).then((res) => {
         if (res.canceled) return;
         if (res.selection === 0) openSkillTreeMenu(player);
         else if (res.selection === 1) openEquipUnifiedMenu(player);
-        else if (res.selection === 2) openMainMenu(player);
+        else if (res.selection === 2) {
+            rpgData.enable3x3 = !is3x3Enabled;
+            savePlayerRpgData(player, rpgData);
+            player.sendMessage(`§a[RPG] Mode Hancur 3x3 sekarang ${rpgData.enable3x3 ? "NYALA" : "MATI"}.`);
+            openRpgMenu(player);
+        }
+        else if (res.selection === 3) openMainMenu(player);
     });
 }
 
@@ -625,36 +635,39 @@ world.afterEvents.playerBreakBlock.subscribe((event) => {
         // Base XP: 5 per log
         addXp(player, "woodcutting", 5);
 
-        // Active Skill: Timber (Breaks a 3x3x3 area of logs if sneaking, equipped, and off cooldown)
-        if (player.isSneaking && rpgData.equippedSkills.includes("lumberjacks_sweep")) {
+        // Active Skill: Lumberjack's Sweep
+        if (rpgData.enable3x3 && rpgData.equippedSkills.includes("lumberjacks_sweep")) {
             if (canUseActiveSkill(player.name, "lumberjacks_sweep", 5000)) { // 5 second cooldown
                 const broken = breakBlockArea(player, block, 1, typeId);
                 if (broken > 0) {
-                    player.sendMessage(`§a[Skill] §fTimber aktif! Menghancurkan §e${broken} balok kayu§f.`);
-                    addXp(player, "woodcutting", broken * 5); // Give XP for the destroyed logs too
+                    player.sendMessage(`§a[Skill] §fLumberjack's Sweep aktif! Menghancurkan §e${broken} balok kayu§f.`);
+                    addXp(player, "woodcutting", broken * 5);
                 }
             } else {
-                player.onScreenDisplay.setActionBar("§cSkill 'Timber' masih cooldown!");
+                player.onScreenDisplay.setActionBar("§cSkill 'Lumberjack's Sweep' masih cooldown!");
             }
         }
     } else if (isOre) {
         // Base XP: 3 per stone/ore
         addXp(player, "mining", 3);
 
-        // Active Skill: Vein Miner (Breaks a 3x3x3 area of ores if sneaking, equipped, and off cooldown)
-        if (player.isSneaking && rpgData.equippedSkills.includes("ore_excavation")) {
+        // Active Skill: Ore Excavation
+        if (rpgData.enable3x3 && rpgData.equippedSkills.includes("ore_excavation")) {
             if (canUseActiveSkill(player.name, "ore_excavation", 10000)) { // 10 second cooldown
                 const broken = breakBlockArea(player, block, 1, typeId);
                 if (broken > 0) {
-                    player.sendMessage(`§a[Skill] §fVein Miner aktif! Menghancurkan §e${broken} blok mineral§f.`);
+                    player.sendMessage(`§a[Skill] §fOre Excavation aktif! Menghancurkan §e${broken} blok mineral§f.`);
                     addXp(player, "mining", broken * 3);
                 }
             } else {
-                player.onScreenDisplay.setActionBar("§cSkill 'Vein Miner' masih cooldown!");
+                player.onScreenDisplay.setActionBar("§cSkill 'Ore Excavation' masih cooldown!");
             }
         }
     }
 });
+
+// Cooldown Tracker for Slayer XP to prevent auto-spawner farming
+const slayerXpCooldowns = new Map();
 
 // Handle RPG Slayer XP and Bounty claims on Entity death
 world.afterEvents.entityDie.subscribe((event) => {
@@ -669,15 +682,20 @@ world.afterEvents.entityDie.subscribe((event) => {
         // RPG Slayer XP logic (For non-player entity kills)
         const isMonster = !deadEntity.typeId.includes("player") && !deadEntity.typeId.includes("item");
         if (isMonster) {
-            // Base XP: 10 per mob kill
-            addXp(killerPlayer, "slayer", 10);
+            // Check Slayer Cooldown (max 1 kill registered for XP per 1.5 seconds)
+            const lastSlayerXp = slayerXpCooldowns.get(killerPlayer.name) || 0;
+            if (Date.now() - lastSlayerXp > 1500) {
+                // Base XP: 10 per mob kill
+                addXp(killerPlayer, "slayer", 10);
+                slayerXpCooldowns.set(killerPlayer.name, Date.now());
 
-            const rpgData = getPlayerRpgData(killerPlayer);
-            // Active Skill: Lifesteal (Heals player if sneaking, equipped, and off cooldown)
-            if (killerPlayer.isSneaking && rpgData.equippedSkills.includes("siphon_strike")) {
-                if (canUseActiveSkill(killerPlayer.name, "siphon_strike", 15000)) { // 15s cooldown
-                    killerPlayer.addEffect("instant_health", 1, { amplifier: 0, showParticles: true });
-                    killerPlayer.sendMessage("§a[Skill] §fLifesteal aktif! HP dipulihkan.");
+                const rpgData = getPlayerRpgData(killerPlayer);
+                // Active Skill: Siphon Strike
+                if (killerPlayer.isSneaking && rpgData.equippedSkills.includes("siphon_strike")) {
+                    if (canUseActiveSkill(killerPlayer.name, "siphon_strike", 15000)) { // 15s cooldown
+                        killerPlayer.addEffect("instant_health", 1, { amplifier: 0, showParticles: true });
+                        killerPlayer.sendMessage("§a[Skill] §fSiphon Strike aktif! HP dipulihkan.");
+                    }
                 }
             }
         }
@@ -804,29 +822,25 @@ function openBuyAmountMenu(player, itemData) {
                 return;
             }
 
-            // Validate if there is at least one empty slot before taking money
-            // This is a basic safety net. For unstackable overages, we will spawn it.
-            if (invComponent.container.emptySlotsCount === 0) {
-                player.sendMessage("§c[Shop] Tas lu penuh cuy! Kosongin dulu sebelum beli.");
+            const maxStackSize = new ItemStack(itemData.id, 1).maxAmount;
+            const slotsNeeded = Math.ceil(amount / maxStackSize);
+
+            // Hard check to prevent dropping items as entities and lagging the server
+            if (invComponent.container.emptySlotsCount < slotsNeeded) {
+                player.sendMessage(`§c[Shop] Tas lu gak cukup buat nampung barang ini cuy! Butuh ${slotsNeeded} slot kosong.`);
                 return;
             }
 
             setScore(player, "dompet", currentCoins - totalCost);
 
-            // Handling unstackable/excess item distributions properly
-            const maxStackSize = new ItemStack(itemData.id, 1).maxAmount;
             let remaining = amount;
-
             while (remaining > 0) {
                 let toGive = Math.min(remaining, maxStackSize);
                 let stackToGive = new ItemStack(itemData.id, toGive);
 
                 try {
                     invComponent.container.addItem(stackToGive);
-                } catch(e) {
-                    // Fallback to dropping items on the floor if inventory randomly rejects it
-                    player.dimension.spawnItem(stackToGive, player.location);
-                }
+                } catch(e) {}
                 remaining -= toGive;
             }
 
@@ -905,8 +919,16 @@ world.afterEvents.entityHitEntity.subscribe((event) => {
 
     if (!item) return;
 
-    const effect = item.getDynamicProperty("gacha_effect");
-    if (!effect || typeof effect !== 'string') return;
+    // Dynamic import to break circular logic locally
+    import("./gacha_effects.js").then(mod => {
+        const effect = mod.safeGetGachaEffect(item);
+        if (!effect || typeof effect !== 'string' || effect === "none") return;
+
+        executeWeaponEffect(effect, attacker, target);
+    }).catch(() => {});
+});
+
+function executeWeaponEffect(effect, attacker, target) {
 
     // Execute Custom Effect Logic
     if (effect === "poison_1") {
@@ -959,4 +981,4 @@ world.afterEvents.entityHitEntity.subscribe((event) => {
             target.addEffect("instant_damage", 1, { amplifier: 1, showParticles: false });
         }
     }
-});
+}

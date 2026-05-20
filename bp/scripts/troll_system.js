@@ -139,6 +139,12 @@ function executeTroll(targetPlayer, trollIndex) {
 
         } else if (trollIndex === 3) { // Terbang Bebas
             targetPlayer.addEffect("levitation", 60, { amplifier: 4, showParticles: false });
+            // Add slow falling right after levitation ends (60 ticks) to prevent unfair deaths
+            system.runTimeout(() => {
+                if (targetPlayer.isValid()) {
+                    targetPlayer.addEffect("slow_falling", 100, { amplifier: 0, showParticles: true });
+                }
+            }, 60);
 
         } else if (trollIndex === 4) { // Hujan Kelelawar
             for (let i = 0; i < 15; i++) {

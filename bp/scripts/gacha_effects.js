@@ -76,3 +76,36 @@ function getFormatCode(rarityStr) {
     if (rarityStr === "Legendary") return "6§l";
     return "f";
 }
+
+// New Helper to recover lost dynamic properties via Lore reading
+export function getEffectFromLore(item) {
+    const lore = item.getLore();
+    if (!lore || lore.length < 2) return "none";
+
+    const descLine = lore[1]; // "§r§7Kekuatan: §eNama Efek §f(§7Desc§f)"
+    if (!descLine.includes("Kekuatan: ")) return "none";
+
+    // Extract Effect Name from between "§e" and " §f("
+    const nameMatch = descLine.match(/§e(.*?) §f\(/);
+    if (!nameMatch || nameMatch.length < 2) return "none";
+
+    const effectName = nameMatch[1];
+
+    // Search all pools for matching name
+    const allEffects = [...WEAPON_EFFECTS, ...HELMET_EFFECTS, ...CHEST_EFFECTS, ...LEG_EFFECTS, ...BOOT_EFFECTS, ...TOOL_EFFECTS];
+    const found = allEffects.find(e => e.name === effectName);
+
+    return found ? found.id : "none";
+}
+
+export function safeGetGachaEffect(item) {
+    let eff = item.getDynamicProperty("gacha_effect");
+    if (!eff || eff === "none") {
+        eff = getEffectFromLore(item);
+        // If recovered from lore, restore the dynamic property to fix the item
+        if (eff !== "none") {
+            try { item.setDynamicProperty("gacha_effect", eff); } catch(e) {}
+        }
+    }
+    return eff;
+}

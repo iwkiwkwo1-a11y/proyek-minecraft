@@ -170,18 +170,22 @@ export function applyPassiveStats(player, rpgData) {
         }
 
         // --- Equipment Gacha Passives (Armor & Tools in hand) ---
-        const invComponent = player.getComponent("inventory");
-        const eqComponent = player.getComponent("equippable");
+        // Dynamically import to avoid top-level circular dependency breaking
+        import("./gacha_effects.js").then(mod => {
+            const safeGet = mod.safeGetGachaEffect;
 
-        if (eqComponent) {
-            const head = eqComponent.getEquipment("Head");
-            const chest = eqComponent.getEquipment("Chest");
-            const legs = eqComponent.getEquipment("Legs");
-            const feet = eqComponent.getEquipment("Feet");
+            const invComponent = player.getComponent("inventory");
+            const eqComponent = player.getComponent("equippable");
 
-            const checkEq = (item) => {
-                if (!item) return;
-                const eff = item.getDynamicProperty("gacha_effect");
+            if (eqComponent) {
+                const head = eqComponent.getEquipment("Head");
+                const chest = eqComponent.getEquipment("Chest");
+                const legs = eqComponent.getEquipment("Legs");
+                const feet = eqComponent.getEquipment("Feet");
+
+                const checkEq = (item) => {
+                    if (!item) return;
+                    const eff = safeGet(item);
                 if (eff === "clear_mind") player.removeEffect("blindness");
                 if (eff === "aqua_lung") player.addEffect("water_breathing", 60, { amplifier: 0, showParticles: false });
                 if (eff === "third_eye") player.addEffect("night_vision", 300, { amplifier: 0, showParticles: false });
@@ -205,23 +209,24 @@ export function applyPassiveStats(player, rpgData) {
                     player.addEffect("speed", 30, { amplifier: 2, showParticles: false });
                     player.addEffect("jump_boost", 30, { amplifier: 2, showParticles: false });
                 }
-            };
+                };
 
-            checkEq(head);
-            checkEq(chest);
-            checkEq(legs);
-            checkEq(feet);
-        }
-
-        if (invComponent && invComponent.container) {
-            const mainHand = invComponent.container.getItem(player.selectedSlotIndex);
-            if (mainHand) {
-                const eff = mainHand.getDynamicProperty("gacha_effect");
-                if (eff === "miner_touch") player.addEffect("haste", 30, { amplifier: 0, showParticles: false });
-                if (eff === "geo_master") player.addEffect("haste", 30, { amplifier: 1, showParticles: false });
-                if (eff === "god_breaker") player.addEffect("haste", 30, { amplifier: 3, showParticles: false });
+                checkEq(head);
+                checkEq(chest);
+                checkEq(legs);
+                checkEq(feet);
             }
-        }
+
+            if (invComponent && invComponent.container) {
+                const mainHand = invComponent.container.getItem(player.selectedSlotIndex);
+                if (mainHand) {
+                    const eff = safeGet(mainHand);
+                    if (eff === "miner_touch") player.addEffect("haste", 30, { amplifier: 0, showParticles: false });
+                    if (eff === "geo_master") player.addEffect("haste", 30, { amplifier: 1, showParticles: false });
+                    if (eff === "god_breaker") player.addEffect("haste", 30, { amplifier: 3, showParticles: false });
+                }
+            }
+        }).catch(() => {});
 
     } catch(e) {}
 }

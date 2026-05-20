@@ -255,6 +255,7 @@ function openMainMenu(player) {
     form.button("§6§lTop Sultan\n§7Peringkat pemain terkaya");
     form.button("§d§lMenu RPG & Skill\n§7Level & Kemampuan Aktif");
     form.button("§5§lGacha & Core\n§7Sihir Senjata & Pasif Dewa");
+    form.button("§4§lTroll Pemain\n§7Jahilin temanmu (Rp1 Juta)");
 
     form.show(player).then((response) => {
         if (response.canceled) return;
@@ -280,11 +281,15 @@ function openMainMenu(player) {
             case 6:
                 openGachaMenu(player);
                 break;
+            case 7:
+                openTrollMenu(player);
+                break;
         }
     });
 }
 
 import { openGachaMenu } from "./gacha_system.js";
+import { openTrollMenu } from "./troll_system.js";
 
 function openRpgMenu(player) {
     const rpgData = getPlayerRpgData(player);

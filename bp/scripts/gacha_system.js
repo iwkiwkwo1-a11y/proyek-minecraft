@@ -1,5 +1,8 @@
 import { world, system, ItemStack } from "@minecraft/server";
-import { ActionFormData, ModalFormData } from "@minecraft/server-ui";
+import { ActionFormData, ModalFormData, MessageFormData } from "@minecraft/server-ui";
+import { getPlayerRpgData, savePlayerRpgData } from "./rpg_system.js";
+import { formatRupiah } from "./utils.js";
+import { getItemCategory, getEffectPool } from "./gacha_effects.js";
 
 // Constants
 export const CORE_PRICE = 100000;
@@ -51,9 +54,6 @@ export const PASSIVE_POOL = [
     { id: "vitality", name: "❤ Vitality", desc: "Health Boost Permanen" },
     { id: "regeneration", name: "✨ Vigor", desc: "Regen HP Perlahan" }
 ];
-
-import { getPlayerRpgData, savePlayerRpgData } from "./rpg_system.js";
-import { formatRupiah } from "./utils.js";
 
 export function openPassiveGacha(player) {
     const objCore = world.scoreboard.getObjective("core");
@@ -161,11 +161,9 @@ export function openEquipmentGacha(player) {
         return;
     }
 
-    // Simplistic check to ensure it's a gear piece
-    const isGear = item.typeId.includes("sword") || item.typeId.includes("axe") || item.typeId.includes("helmet") || item.typeId.includes("chestplate") || item.typeId.includes("leggings") || item.typeId.includes("boots");
-
-    if (!isGear) {
-        player.sendMessage("§c[Gacha] Barang di tanganmu bukan senjata atau armor yang valid!");
+    const category = getItemCategory(item.typeId);
+    if (category === "invalid") {
+        player.sendMessage("§c[Gacha] Barang di tanganmu tidak bisa di-gacha! (Harus Senjata, Tool, atau Armor).");
         return;
     }
 
@@ -178,32 +176,72 @@ export function openEquipmentGacha(player) {
         return;
     }
 
-    // Deduct Core
+    // Handle Reroll Confirmation Flow
+    const existingEffect = item.getDynamicProperty("gacha_effect");
+    if (existingEffect && typeof existingEffect === "string" && existingEffect !== "none") {
+        // Player already has an effect, execute reroll confirmation flow
+        executeRerollFlow(player, item, selectedSlot, inv, currentCore, objCore, category);
+        return;
+    }
+
+    // Direct Gacha Flow for items without an effect
     objCore.setScore(player, currentCore - GACHA_COST_EQUIPMENT);
+    applyGachaResult(player, item, selectedSlot, inv, category);
+}
 
-    // Perform Gacha
+function executeRerollFlow(player, item, slotIndex, inv, currentCore, objCore, category) {
     const rarity = getRandomRarity();
+    const newEffectData = getEffectPool(category, rarity.name);
 
-    // Apply dynamic property to item
-    item.setDynamicProperty("gacha_effect", rarity.effect);
+    // Get old effect data for comparison
+    const oldEffectId = item.getDynamicProperty("gacha_effect");
+    const oldLore = item.getLore();
+    const oldDesc = oldLore.length > 1 ? oldLore[1].replace("§r§7Kekuatan: ", "") : "Unknown";
 
-    // Update Lore to display effect
-    let effectText = "";
-    if (rarity.effect === "frostbite") effectText = "§bFrostbite (Slow & Damage)";
-    if (rarity.effect === "abyssal_wither") effectText = "§8Abyssal Wither (Wither Area)";
-    if (rarity.effect === "thunderous_smite") effectText = "§eThunderous Smite (Petir OP)";
-    if (rarity.effect === "none") effectText = "§7Kosong";
+    const form = new MessageFormData();
+    form.title("§5[ Reroll Konfirmasi ]");
+    form.body(`§fBarang ini sudah memiliki kekuatan sihir!\n\n§cEfek Lama:\n§7${oldDesc}\n\n§aEfek Baru Didapat:\n§r${rarity.name} §f- §e${newEffectData.name}\n§7${newEffectData.desc}\n\n§fApakah kamu ingin mengganti kekuatan lama dengan kekuatan baru ini? (Core tetap akan terpotong).`);
+    form.button1("§aYa, Ganti!");
+    form.button2("§cTidak, Simpan Lama");
 
+    form.show(player).then(res => {
+        if (res.canceled) return;
+
+        // Deduct core regardless of choice
+        objCore.setScore(player, currentCore - GACHA_COST_EQUIPMENT);
+
+        if (res.selection === 1) { // Ganti
+            item.setDynamicProperty("gacha_effect", newEffectData.id);
+            const newLore = [
+                `§r${rarity.name}`,
+                `§r§7Kekuatan: §e${newEffectData.name} §f(§7${newEffectData.desc}§f)`
+            ];
+            item.setLore(newLore);
+            inv.setItem(slotIndex, item);
+
+            triggerGachaAnimations(player, rarity, newEffectData);
+        } else {
+            player.sendMessage("§e[Gacha] Kamu memilih mempertahankan kekuatan lama.");
+        }
+    });
+}
+
+function applyGachaResult(player, item, slotIndex, inv, category) {
+    const rarity = getRandomRarity();
+    const effectData = getEffectPool(category, rarity.name);
+
+    item.setDynamicProperty("gacha_effect", effectData.id);
     const newLore = [
         `§r${rarity.name}`,
-        `§r§7Kekuatan Gacha: ${effectText}`
+        `§r§7Kekuatan: §e${effectData.name} §f(§7${effectData.desc}§f)`
     ];
     item.setLore(newLore);
+    inv.setItem(slotIndex, item);
 
-    // Save item back to inventory
-    inv.setItem(selectedSlot, item);
+    triggerGachaAnimations(player, rarity, effectData);
+}
 
-    // Animations & Feedback
+function triggerGachaAnimations(player, rarity, effectData) {
     if (rarity.name.includes("Epic") || rarity.name.includes("Legendary")) {
         const px = Math.floor(player.location.x);
         const py = Math.floor(player.location.y);
@@ -213,7 +251,7 @@ export function openEquipmentGacha(player) {
         player.dimension.runCommandAsync(`playsound random.levelup @a[x=${px},y=${py},z=${pz},r=10]`);
         player.dimension.runCommandAsync(`camerashake add @a[x=${px},y=${py},z=${pz},r=10] 0.5 1 positional`);
 
-        world.sendMessage(`§6§l[GACHA] §r§fPemain §b${player.name} §fbaru saja mendapatkan senjata §l${rarity.name} §fberkekuatan §e${effectText}§f!`);
+        world.sendMessage(`§6§l[GACHA] §r§fPemain §b${player.name} §fbaru saja mendapatkan sihir §l${rarity.name} §e${effectData.name}§f!`);
     } else {
         player.sendMessage(`§a[Gacha] Sukses menyihir barang! Kamu mendapatkan grade ${rarity.name}.`);
         player.dimension.runCommandAsync(`playsound random.orb @a[x=${Math.floor(player.location.x)},y=${Math.floor(player.location.y)},z=${Math.floor(player.location.z)},r=5]`);

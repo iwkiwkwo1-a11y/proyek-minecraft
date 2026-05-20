@@ -155,5 +155,60 @@ export function applyPassiveStats(player, rpgData) {
         if (passives.includes("regeneration")) {
             player.addEffect("regeneration", 60, { amplifier: 0, showParticles: false }); // Regen 1
         }
+
+        // --- Equipment Gacha Passives (Armor & Tools in hand) ---
+        const invComponent = player.getComponent("inventory");
+        const eqComponent = player.getComponent("equippable");
+
+        if (eqComponent) {
+            const head = eqComponent.getEquipment("Head");
+            const chest = eqComponent.getEquipment("Chest");
+            const legs = eqComponent.getEquipment("Legs");
+            const feet = eqComponent.getEquipment("Feet");
+
+            const checkEq = (item) => {
+                if (!item) return;
+                const eff = item.getDynamicProperty("gacha_effect");
+                if (eff === "night_owl" || eff === "third_eye") player.addEffect("night_vision", 300, { amplifier: 0, showParticles: false });
+                if (eff === "aqua_lung") player.addEffect("water_breathing", 60, { amplifier: 0, showParticles: false });
+
+                if (eff === "iron_skin") player.addEffect("resistance", 30, { amplifier: 0, showParticles: false });
+                if (eff === "turtle_shell") {
+                    player.addEffect("resistance", 30, { amplifier: 1, showParticles: false });
+                    player.addEffect("slowness", 30, { amplifier: 0, showParticles: false });
+                }
+                if (eff === "dragon_scale") {
+                    player.addEffect("resistance", 30, { amplifier: 2, showParticles: false });
+                    player.addEffect("fire_resistance", 30, { amplifier: 0, showParticles: false });
+                }
+
+                if (eff === "sturdy_legs") player.addEffect("health_boost", 30, { amplifier: 0, showParticles: false });
+                if (eff === "tank_legs") player.addEffect("health_boost", 30, { amplifier: 1, showParticles: false });
+                if (eff === "colossus") player.addEffect("health_boost", 30, { amplifier: 3, showParticles: false });
+
+                if (eff === "swift_step") player.addEffect("speed", 30, { amplifier: 0, showParticles: false });
+                if (eff === "frog_jump") player.addEffect("jump_boost", 30, { amplifier: 1, showParticles: false });
+                if (eff === "hermes_boots") {
+                    player.addEffect("speed", 30, { amplifier: 2, showParticles: false });
+                    player.addEffect("jump_boost", 30, { amplifier: 2, showParticles: false });
+                }
+            };
+
+            checkEq(head);
+            checkEq(chest);
+            checkEq(legs);
+            checkEq(feet);
+        }
+
+        if (invComponent && invComponent.container) {
+            const mainHand = invComponent.container.getItem(player.selectedSlotIndex);
+            if (mainHand) {
+                const eff = mainHand.getDynamicProperty("gacha_effect");
+                if (eff === "miner_touch") player.addEffect("haste", 30, { amplifier: 0, showParticles: false });
+                if (eff === "geo_master") player.addEffect("haste", 30, { amplifier: 1, showParticles: false });
+                if (eff === "god_breaker") player.addEffect("haste", 30, { amplifier: 3, showParticles: false });
+            }
+        }
+
     } catch(e) {}
 }

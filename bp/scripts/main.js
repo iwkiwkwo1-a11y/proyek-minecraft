@@ -1,8 +1,10 @@
 import { world, system, ItemStack, ItemLockMode, EnchantmentTypes } from "@minecraft/server";
 import { ActionFormData, ModalFormData } from "@minecraft/server-ui";
 import { EconomyConfig } from "./economy_config.js";
-import { getPlayerRpgData, getXpRequired, generateXpBar, applyPassiveStats, addXp, breakBlockArea, canUseActiveSkill } from "./rpg_system.js";
+import { getPlayerRpgData, getXpRequired, generateXpBar, applyPassiveStats, addXp, breakBlockArea, canUseActiveSkill, savePlayerRpgData } from "./rpg_system.js";
 import { formatRupiah } from "./utils.js";
+import { openGachaMenu, PASSIVE_POOL } from "./gacha_system.js";
+import { openTrollMenu } from "./troll_system.js";
 
 // Initialize Objective
 system.run(() => {
@@ -288,9 +290,6 @@ function openMainMenu(player) {
     });
 }
 
-import { openGachaMenu } from "./gacha_system.js";
-import { openTrollMenu } from "./troll_system.js";
-
 function openRpgMenu(player) {
     const rpgData = getPlayerRpgData(player);
     const form = new ActionFormData();
@@ -334,15 +333,11 @@ function openRpgMenu(player) {
     });
 }
 
-import { PASSIVE_POOL } from "./gacha_system.js";
-
 const AVAILABLE_SKILLS = [
     { id: "ore_excavation", name: "⛏ Ore Excavation (Mining)", desc: "Hancurkan 3x3x3 blok batu/ore sekaligus dengan jongkok.", cost: 15 },
     { id: "lumberjacks_sweep", name: "🪓 Lumberjack's Sweep (Woodcutting)", desc: "Tebang 3x3x3 blok kayu sekaligus dengan jongkok.", cost: 15 },
     { id: "siphon_strike", name: "⚔ Siphon Strike (Slayer)", desc: "Menyembuhkan HP saat membunuh monster dengan jongkok.", cost: 20 }
 ];
-
-import { savePlayerRpgData } from "./rpg_system.js";
 
 function openSkillTreeMenu(player) {
     const rpgData = getPlayerRpgData(player);
@@ -914,24 +909,34 @@ world.afterEvents.entityHitEntity.subscribe((event) => {
     if (!effect || typeof effect !== 'string') return;
 
     // Execute Custom Effect Logic
-    if (effect === "frostbite") {
-        // 20% chance to slow and slightly damage target for 3 seconds
+    if (effect === "poison_1") {
+        if (Math.random() < 0.20) {
+            target.addEffect("poison", 60, { amplifier: 0, showParticles: true });
+        }
+    } else if (effect === "frostbite") {
         if (Math.random() < 0.20) {
             target.addEffect("slowness", 60, { amplifier: 1, showParticles: true });
             target.addEffect("weakness", 60, { amplifier: 0, showParticles: true });
         }
+    } else if (effect === "fire_aspect_x") {
+        if (Math.random() < 0.15) {
+            target.dimension.runCommandAsync(`execute as "${target.id}" at @s run fill ~ ~ ~ ~ ~ ~ fire keep`);
+        }
     } else if (effect === "abyssal_wither") {
-        // 10% chance to Wither Area for 3 seconds
         if (Math.random() < 0.10) {
             target.addEffect("wither", 60, { amplifier: 1, showParticles: true });
             target.dimension.spawnParticle("minecraft:crop_growth_area_emitter", target.location);
         }
     } else if (effect === "thunderous_smite") {
-        // 5% chance to strike lightning and apply massive damage effects
         if (Math.random() < 0.05) {
             target.dimension.spawnEntity("minecraft:lightning_bolt", target.location);
             target.addEffect("slowness", 40, { amplifier: 4, showParticles: false });
             attacker.sendMessage("§e§l[THUNDEROUS SMITE] §r§fKekuatan senjata Legendary menebas musuh!");
+        }
+    } else if (effect === "vampiric") {
+        if (Math.random() < 0.10) {
+            attacker.addEffect("instant_health", 1, { amplifier: 1, showParticles: true });
+            attacker.dimension.spawnParticle("minecraft:heart_particle", attacker.location);
         }
     }
 });

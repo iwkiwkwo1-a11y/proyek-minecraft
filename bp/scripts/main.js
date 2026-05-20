@@ -14,6 +14,47 @@ system.run(() => {
     }
 });
 
+// Shop Rotation State
+let currentShopItems = [];
+let nextRefreshTime = Date.now() + 60000; // 1 minute from now
+
+function refreshShop() {
+    const normalKeys = Object.keys(EconomyConfig.buyPoolNormal);
+    const opKeys = Object.keys(EconomyConfig.buyPoolOP);
+
+    // Shuffle arrays
+    normalKeys.sort(() => 0.5 - Math.random());
+    opKeys.sort(() => 0.5 - Math.random());
+
+    currentShopItems = [];
+
+    // Pick 29 random normal items
+    const selectedNormals = normalKeys.slice(0, 29);
+    for (const key of selectedNormals) {
+        currentShopItems.push({ id: key, price: EconomyConfig.buyPoolNormal[key], isOP: false });
+    }
+
+    // Pick 1 random OP item
+    const selectedOP = opKeys[0];
+    currentShopItems.push({ id: selectedOP, price: EconomyConfig.buyPoolOP[selectedOP], isOP: true });
+
+    // Shuffle the final list so the OP item isn't always last
+    currentShopItems.sort(() => 0.5 - Math.random());
+
+    nextRefreshTime = Date.now() + 60000;
+}
+
+// Initial shop load
+refreshShop();
+
+// Shop Rotation Timer (Checks every 20 ticks)
+system.runInterval(() => {
+    if (Date.now() >= nextRefreshTime) {
+        refreshShop();
+        world.sendMessage("§e[Shop] §fBarang jualan di Menu Beli telah diperbarui! Cek sekarang!");
+    }
+}, 20);
+
 function getScore(player, objectiveId) {
     const obj = world.scoreboard.getObjective(objectiveId);
     if (!obj) return 0;
@@ -408,9 +449,24 @@ function openTransferMenu(player) {
     });
 }
 
-// Global variable to store active bounties
+// Helper functions to persist bounties across server restarts
+function loadBounties() {
+    try {
+        const data = world.getDynamicProperty("active_bounties");
+        if (data && typeof data === 'string') {
+            return JSON.parse(data);
+        }
+    } catch(e) {}
+    return {};
+}
+
+function saveBounties(bountiesObj) {
+    world.setDynamicProperty("active_bounties", JSON.stringify(bountiesObj));
+}
+
+// Global variable to store active bounties loaded from persistent storage
 // Structure: { "TargetPlayerName": { amount: number, setter: "SetterName" } }
-const activeBounties = {};
+let activeBounties = loadBounties();
 
 function openBountyMenu(player) {
     const form = new ActionFormData();
@@ -464,12 +520,13 @@ function openSetBountyMenu(player) {
         // Deduct coins
         setScore(player, "dompet", currentCoins - amount);
 
-        // Add to active bounties
+        // Add to active bounties and save to world properties
         if (activeBounties[targetPlayerName]) {
             activeBounties[targetPlayerName].amount += amount;
         } else {
             activeBounties[targetPlayerName] = { amount: amount, setter: player.name };
         }
+        saveBounties(activeBounties);
 
         world.sendMessage(`§c§l[BOUNTY] §r§e${player.name} §ftelah memasang harga buronan sebesar §a${amount} Rupiah §funtuk kepala §c${targetPlayerName}§f!`);
     });
@@ -548,18 +605,13 @@ world.afterEvents.playerBreakBlock.subscribe((event) => {
 world.afterEvents.entityDie.subscribe((event) => {
     const deadEntity = event.deadEntity;
     const damageSource = event.damageSource;
-
-    // Check if the dead entity is a player
-    if (deadEntity.typeId !== "minecraft:player") return;
-
-    const deadPlayerName = deadEntity.name;
     const killer = damageSource.damagingEntity;
 
     // Check if there is a killer and the killer is a player
     if (killer && killer.typeId === "minecraft:player") {
         const killerPlayer = killer;
 
-        // RPG Slayer XP logic
+        // RPG Slayer XP logic (For non-player entity kills)
         const isMonster = !deadEntity.typeId.includes("player") && !deadEntity.typeId.includes("item");
         if (isMonster) {
             // Base XP: 10 per mob kill
@@ -575,20 +627,25 @@ world.afterEvents.entityDie.subscribe((event) => {
             }
         }
 
-        // Check if the dead player had a bounty
-        if (activeBounties[deadPlayerName]) {
-            const bountyData = activeBounties[deadPlayerName];
-            const bountyAmount = bountyData.amount;
+        // Check if the dead entity is a player for Bounty claims
+        if (deadEntity.typeId === "minecraft:player") {
+            const deadPlayerName = deadEntity.name;
 
-            // Give reward to killer
-            const killerCoins = getScore(killerPlayer, "dompet");
-            setScore(killerPlayer, "dompet", killerCoins + bountyAmount);
+            if (activeBounties[deadPlayerName] && killerPlayer.name !== deadPlayerName) {
+                const bountyData = activeBounties[deadPlayerName];
+                const bountyAmount = bountyData.amount;
 
-            // Announce to world
-            world.sendMessage(`§c§l[BOUNTY CLAIMED] §r§b${killerPlayer.name} §ftelah membunuh buronan §c${deadPlayerName} §fdan mendapatkan hadiah §e${bountyAmount} Rupiah§f!`);
+                // Give reward to killer
+                const killerCoins = getScore(killerPlayer, "dompet");
+                setScore(killerPlayer, "dompet", killerCoins + bountyAmount);
 
-            // Remove bounty
-            delete activeBounties[deadPlayerName];
+                // Announce to world
+                world.sendMessage(`§c§l[BOUNTY CLAIMED] §r§b${killerPlayer.name} §ftelah membunuh buronan §c${deadPlayerName} §fdan mendapatkan hadiah §e${bountyAmount} Rupiah§f!`);
+
+                // Remove bounty and save state
+                delete activeBounties[deadPlayerName];
+                saveBounties(activeBounties);
+            }
         }
     }
 });
@@ -630,23 +687,67 @@ function openTopKoinMenu(player) {
     }
 }
 
+function formatItemName(id) {
+    // Converts "minecraft:apple" to "Apple"
+    const name = id.replace("minecraft:", "").replace(/_/g, " ");
+    return name.replace(/\b\w/g, l => l.toUpperCase());
+}
+
 function openBuyMenu(player) {
-    const price = EconomyConfig.buyPrices["minecraft:bread"];
+    const secondsLeft = Math.ceil((nextRefreshTime - Date.now()) / 1000);
     const form = new ActionFormData();
-    form.title("§1[ Menu Beli Roti ]");
-    form.button(`Beli Roti\n§e${price} Rupiah`);
+    form.title("§1[ Toko Dinamis ]");
+    form.body(`§eSisa Waktu Refresh: §f${secondsLeft} detik\n§7Barang-barang ini akan berubah secara acak!`);
+
+    // Create buttons for current shop items
+    // Since currentShopItems might be updated if timer hits while form is open,
+    // we take a local snapshot to avoid out-of-bounds selection errors.
+    const snapshot = [...currentShopItems];
+
+    for (const item of snapshot) {
+        const displayName = formatItemName(item.id);
+        const priceStr = item.price.toLocaleString("id-ID");
+        if (item.isOP) {
+            form.button(`§d§l[OP] ${displayName}§r\n§eRp${priceStr}`);
+        } else {
+            form.button(`§f${displayName}\n§eRp${priceStr}`);
+        }
+    }
+    form.button("§cKembali");
 
     form.show(player).then((response) => {
         if (response.canceled) return;
-        if (response.selection === 0) {
-            const currentCoins = getScore(player, "dompet");
-            if (currentCoins >= price) {
-                setScore(player, "dompet", currentCoins - price);
-                player.runCommandAsync(`give @s minecraft:bread 1`);
-                player.sendMessage("§a[Shop] Sukses membeli 1 Roti!");
-            } else {
-                player.sendMessage("§c[Shop] Rupiah lu gak cukup, cuy!");
-            }
+        if (response.selection === snapshot.length) {
+            openMainMenu(player);
+            return;
+        }
+
+        const selectedItem = snapshot[response.selection];
+        openBuyAmountMenu(player, selectedItem);
+    });
+}
+
+function openBuyAmountMenu(player, itemData) {
+    const form = new ModalFormData();
+    const displayName = formatItemName(itemData.id);
+    const priceStr = itemData.price.toLocaleString("id-ID");
+
+    form.title("§a[ Beli Barang ]");
+    form.slider(`Berapa banyak §e${displayName} §fyang ingin kamu beli?\n§7Harga Satuan: Rp${priceStr}`, 1, 64, 1, 1);
+
+    form.show(player).then((response) => {
+        if (response.canceled) return;
+
+        const amount = Math.floor(response.formValues[0]);
+        const totalCost = itemData.price * amount;
+        const currentCoins = getScore(player, "dompet");
+
+        if (currentCoins >= totalCost) {
+            setScore(player, "dompet", currentCoins - totalCost);
+            player.runCommandAsync(`give @s ${itemData.id} ${amount}`);
+            player.sendMessage(`§a[Shop] Sukses membeli §e${amount}x ${displayName} §aseharga §eRp${totalCost.toLocaleString("id-ID")}!`);
+        } else {
+            player.sendMessage(`§c[Shop] Rupiah lu gak cukup cuy! Butuh Rp${totalCost.toLocaleString("id-ID")}.`);
         }
     });
 }

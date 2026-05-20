@@ -9,6 +9,9 @@ system.run(() => {
         if (!world.scoreboard.getObjective("dompet")) {
             world.scoreboard.addObjective("dompet", "§e§lPRO SURVIVAL");
         }
+        if (!world.scoreboard.getObjective("core")) {
+            world.scoreboard.addObjective("core", "§b§lCORE");
+        }
     } catch (e) {
         // Ignore if it already exists or errors
     }
@@ -86,7 +89,8 @@ system.runInterval(() => {
         applyPassiveStats(player, rpgData);
 
         const score = getScore(player, "dompet");
-        let actionbarText = `§e§lDOMPET: §f${score} Rupiah §8| §aOnline: ${online}`;
+        const coreScore = getScore(player, "core");
+        let actionbarText = `§e§lDOMPET: §f${score} Rupiah §8| §b§lCORE: §f${coreScore} §8| §aOnline: ${online}`;
 
         // Check if player earned XP recently (within last 3 seconds)
         try {
@@ -249,6 +253,7 @@ function openMainMenu(player) {
     form.button("§c§lSistem Bounty\n§7Pasang buronan");
     form.button("§6§lTop Sultan\n§7Peringkat pemain terkaya");
     form.button("§d§lMenu RPG & Skill\n§7Level & Kemampuan Aktif");
+    form.button("§5§lGacha & Core\n§7Sihir Senjata & Pasif Dewa");
 
     form.show(player).then((response) => {
         if (response.canceled) return;
@@ -271,9 +276,14 @@ function openMainMenu(player) {
             case 5:
                 openRpgMenu(player);
                 break;
+            case 6:
+                openGachaMenu(player);
+                break;
         }
     });
 }
+
+import { openGachaMenu } from "./gacha_system.js";
 
 function openRpgMenu(player) {
     const rpgData = getPlayerRpgData(player);
@@ -285,7 +295,7 @@ function openRpgMenu(player) {
     statsStr += `§a🪓 Woodcutting: §fLv.${rpgData.woodcutting.level} §7(${rpgData.woodcutting.xp}/${getXpRequired(rpgData.woodcutting.level)} XP)\n`;
     statsStr += `§c⚔ Slayer: §fLv.${rpgData.slayer.level} §7(${rpgData.slayer.xp}/${getXpRequired(rpgData.slayer.level)} XP)\n`;
 
-    statsStr += `\n§bAktif Skill (Max 2): \n`;
+    statsStr += `\n§bAktif Skill RPG (Max 2): \n`;
     if (rpgData.equippedSkills.length === 0) {
         statsStr += "§7- Belum ada yang di-equip\n";
     } else {
@@ -294,17 +304,74 @@ function openRpgMenu(player) {
         }
     }
 
+    statsStr += `\n§dPasif Gacha (Max 3): \n`;
+    const eqPassives = rpgData.equippedGachaPassives || [];
+    if (eqPassives.length === 0) {
+        statsStr += "§7- Belum ada pasif dewa yang di-equip\n";
+    } else {
+        for (const passive of eqPassives) {
+            statsStr += `§d- ${passive.toUpperCase()}\n`;
+        }
+    }
+
     form.body(statsStr);
 
     form.button("§eSkill Tree (Beli Skill)\n§7Tukar SP dengan Skill Baru");
-    form.button("§aEquip Skill Aktif\n§7Pilih 2 skill andalanmu");
+    form.button("§aEquip Skill Aktif\n§7Kelola 2 skill andalanmu");
+    form.button("§5Equip Pasif Gacha\n§7Kelola 3 pasif dewamu");
     form.button("§cKembali ke Menu Utama");
 
     form.show(player).then((res) => {
         if (res.canceled) return;
         if (res.selection === 0) openSkillTreeMenu(player);
         else if (res.selection === 1) openEquipSkillMenu(player);
-        else if (res.selection === 2) openMainMenu(player);
+        else if (res.selection === 2) openEquipPassiveMenu(player);
+        else if (res.selection === 3) openMainMenu(player);
+    });
+}
+
+const PASSIVE_POOL = [
+    { id: "juggernaut", name: "🛡 Juggernaut" },
+    { id: "ninja", name: "💨 Ninja" },
+    { id: "berserker", name: "⚔ Berserker" }
+];
+
+function openEquipPassiveMenu(player) {
+    const rpgData = getPlayerRpgData(player);
+    const unlockedPassives = rpgData.unlockedGachaPassives || [];
+
+    if (unlockedPassives.length === 0) {
+        player.sendMessage("§c[RPG] Kamu belum memiliki Pasif Dewa dari Gacha!");
+        return;
+    }
+
+    const form = new ModalFormData();
+    form.title("§5[ Equip Pasif Dewa ]");
+
+    for (const passiveId of unlockedPassives) {
+        const passiveInfo = PASSIVE_POOL.find(p => p.id === passiveId);
+        const isEquipped = (rpgData.equippedGachaPassives || []).includes(passiveId);
+        form.toggle(passiveInfo ? passiveInfo.name : passiveId, isEquipped);
+    }
+
+    form.show(player).then((res) => {
+        if (res.canceled) return;
+
+        let newEquipped = [];
+        for (let i = 0; i < unlockedPassives.length; i++) {
+            if (res.formValues[i] === true) {
+                newEquipped.push(unlockedPassives[i]);
+            }
+        }
+
+        if (newEquipped.length > 3) {
+            player.sendMessage("§c[RPG] Kamu hanya bisa meng-equip maksimal 3 Pasif Dewa secara bersamaan!");
+            return;
+        }
+
+        rpgData.equippedGachaPassives = newEquipped;
+        savePlayerRpgData(player, rpgData);
+        player.sendMessage("§a[RPG] Pasif Dewa berhasil diperbarui!");
     });
 }
 
@@ -802,3 +869,44 @@ function processSellAll(player) {
         player.sendMessage("§c[Shop] Tidak ada barang langka yang bisa dijual di tas lu.");
     }
 }
+
+// Handle Custom Gacha Combat Effects on Entity Hit
+world.afterEvents.entityHitEntity.subscribe((event) => {
+    const attacker = event.damagingEntity;
+    const target = event.hitEntity;
+
+    if (!attacker || attacker.typeId !== "minecraft:player") return;
+    if (!target) return;
+
+    // Check main hand item for Gacha effects
+    const invComponent = attacker.getComponent("inventory");
+    if (!invComponent) return;
+    const inv = invComponent.container;
+    const selectedSlot = attacker.selectedSlotIndex;
+    const item = inv.getItem(selectedSlot);
+
+    if (!item) return;
+
+    const effect = item.getDynamicProperty("gacha_effect");
+    if (!effect || typeof effect !== 'string') return;
+
+    // Execute Custom Effect Logic
+    if (effect === "poison") {
+        // 20% chance to poison target for 3 seconds
+        if (Math.random() < 0.20) {
+            target.addEffect("poison", 60, { amplifier: 0, showParticles: true });
+        }
+    } else if (effect === "wither") {
+        // 10% chance to Wither Area for 3 seconds
+        if (Math.random() < 0.10) {
+            target.addEffect("wither", 60, { amplifier: 1, showParticles: true });
+            target.dimension.spawnParticle("minecraft:crop_growth_area_emitter", target.location);
+        }
+    } else if (effect === "lightning") {
+        // 5% chance to strike lightning
+        if (Math.random() < 0.05) {
+            target.dimension.spawnEntity("minecraft:lightning_bolt", target.location);
+            attacker.sendMessage("§b§l[PETIR THOR] §r§fKekuatan senjata Legendary aktif!");
+        }
+    }
+});

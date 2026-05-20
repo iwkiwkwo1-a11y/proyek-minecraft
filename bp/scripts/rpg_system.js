@@ -15,7 +15,9 @@ export function getPlayerRpgData(player) {
         slayer: { level: 1, xp: 0 },
         sp: 0,
         unlockedSkills: [],
-        equippedSkills: []
+        equippedSkills: [],
+        unlockedGachaPassives: [],
+        equippedGachaPassives: []
     };
     try {
         const str = player.getDynamicProperty("rpg_data");
@@ -127,6 +129,20 @@ export function applyPassiveStats(player, rpgData) {
         // Speed
         if (rpgData.slayer.level >= 25) {
             player.addEffect("speed", 30, { amplifier: 0, showParticles: false }); // Speed 1
+        }
+
+        // --- Gacha Passives ---
+        if (rpgData.equippedGachaPassives && rpgData.equippedGachaPassives.includes("juggernaut")) {
+            player.addEffect("resistance", 30, { amplifier: 1, showParticles: false }); // Resistance 2
+        }
+
+        if (rpgData.equippedGachaPassives && rpgData.equippedGachaPassives.includes("ninja")) {
+            player.addEffect("speed", 30, { amplifier: 1, showParticles: false }); // Speed 2 (Overrides Slayer Speed 1)
+            player.addEffect("jump_boost", 30, { amplifier: 1, showParticles: false });
+        }
+
+        if (rpgData.equippedGachaPassives && rpgData.equippedGachaPassives.includes("berserker")) {
+            player.addEffect("strength", 30, { amplifier: 0, showParticles: false }); // Strength 1
         }
     } catch(e) {}
 }

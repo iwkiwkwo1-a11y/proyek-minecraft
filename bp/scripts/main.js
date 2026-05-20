@@ -82,11 +82,11 @@ system.runInterval(() => {
     const players = world.getAllPlayers();
     const online = players.length;
     for (const player of players) {
-        if (hiddenBoards.get(player.name)) continue;
-
-        // Passive Stats application (runs constantly)
+        // Passive Stats application (runs constantly regardless of actionbar visibility)
         const rpgData = getPlayerRpgData(player);
         applyPassiveStats(player, rpgData);
+
+        if (hiddenBoards.get(player.name)) continue;
 
         const score = getScore(player, "dompet");
         const coreScore = getScore(player, "core");
@@ -330,11 +330,7 @@ function openRpgMenu(player) {
     });
 }
 
-const PASSIVE_POOL = [
-    { id: "juggernaut", name: "🛡 Juggernaut" },
-    { id: "ninja", name: "💨 Ninja" },
-    { id: "berserker", name: "⚔ Berserker" }
-];
+import { PASSIVE_POOL } from "./gacha_system.js";
 
 function openEquipPassiveMenu(player) {
     const rpgData = getPlayerRpgData(player);
@@ -376,9 +372,9 @@ function openEquipPassiveMenu(player) {
 }
 
 const AVAILABLE_SKILLS = [
-    { id: "vein_miner", name: "⛏ Vein Miner (Mining)", desc: "Hancurkan 3x3x3 blok batu/ore sekaligus dengan jongkok.", cost: 10 },
-    { id: "timber", name: "🪓 Timber (Woodcutting)", desc: "Tebang 3x3x3 blok kayu sekaligus dengan jongkok.", cost: 10 },
-    { id: "lifesteal", name: "⚔ Lifesteal (Slayer)", desc: "Menyembuhkan HP saat membunuh monster dengan jongkok.", cost: 15 }
+    { id: "ore_excavation", name: "⛏ Ore Excavation (Mining)", desc: "Hancurkan 3x3x3 blok batu/ore sekaligus dengan jongkok.", cost: 15 },
+    { id: "lumberjacks_sweep", name: "🪓 Lumberjack's Sweep (Woodcutting)", desc: "Tebang 3x3x3 blok kayu sekaligus dengan jongkok.", cost: 15 },
+    { id: "siphon_strike", name: "⚔ Siphon Strike (Slayer)", desc: "Menyembuhkan HP saat membunuh monster dengan jongkok.", cost: 20 }
 ];
 
 import { savePlayerRpgData } from "./rpg_system.js";
@@ -638,8 +634,8 @@ world.afterEvents.playerBreakBlock.subscribe((event) => {
         addXp(player, "woodcutting", 5);
 
         // Active Skill: Timber (Breaks a 3x3x3 area of logs if sneaking, equipped, and off cooldown)
-        if (player.isSneaking && rpgData.equippedSkills.includes("timber")) {
-            if (canUseActiveSkill(player.name, "timber", 5000)) { // 5 second cooldown
+        if (player.isSneaking && rpgData.equippedSkills.includes("lumberjacks_sweep")) {
+            if (canUseActiveSkill(player.name, "lumberjacks_sweep", 5000)) { // 5 second cooldown
                 const broken = breakBlockArea(player, block, 1, typeId);
                 if (broken > 0) {
                     player.sendMessage(`§a[Skill] §fTimber aktif! Menghancurkan §e${broken} balok kayu§f.`);
@@ -654,8 +650,8 @@ world.afterEvents.playerBreakBlock.subscribe((event) => {
         addXp(player, "mining", 3);
 
         // Active Skill: Vein Miner (Breaks a 3x3x3 area of ores if sneaking, equipped, and off cooldown)
-        if (player.isSneaking && rpgData.equippedSkills.includes("vein_miner")) {
-            if (canUseActiveSkill(player.name, "vein_miner", 10000)) { // 10 second cooldown
+        if (player.isSneaking && rpgData.equippedSkills.includes("ore_excavation")) {
+            if (canUseActiveSkill(player.name, "ore_excavation", 10000)) { // 10 second cooldown
                 const broken = breakBlockArea(player, block, 1, typeId);
                 if (broken > 0) {
                     player.sendMessage(`§a[Skill] §fVein Miner aktif! Menghancurkan §e${broken} blok mineral§f.`);
@@ -686,8 +682,8 @@ world.afterEvents.entityDie.subscribe((event) => {
 
             const rpgData = getPlayerRpgData(killerPlayer);
             // Active Skill: Lifesteal (Heals player if sneaking, equipped, and off cooldown)
-            if (killerPlayer.isSneaking && rpgData.equippedSkills.includes("lifesteal")) {
-                if (canUseActiveSkill(killerPlayer.name, "lifesteal", 15000)) { // 15s cooldown
+            if (killerPlayer.isSneaking && rpgData.equippedSkills.includes("siphon_strike")) {
+                if (canUseActiveSkill(killerPlayer.name, "siphon_strike", 15000)) { // 15s cooldown
                     killerPlayer.addEffect("instant_health", 1, { amplifier: 0, showParticles: true });
                     killerPlayer.sendMessage("§a[Skill] §fLifesteal aktif! HP dipulihkan.");
                 }
@@ -810,8 +806,38 @@ function openBuyAmountMenu(player, itemData) {
         const currentCoins = getScore(player, "dompet");
 
         if (currentCoins >= totalCost) {
+            const invComponent = player.getComponent("inventory");
+            if (!invComponent || !invComponent.container) {
+                player.sendMessage("§c[Shop] Gagal mengakses inventory kamu!");
+                return;
+            }
+
+            // Validate if there is at least one empty slot before taking money
+            // This is a basic safety net. For unstackable overages, we will spawn it.
+            if (invComponent.container.emptySlotsCount === 0) {
+                player.sendMessage("§c[Shop] Tas lu penuh cuy! Kosongin dulu sebelum beli.");
+                return;
+            }
+
             setScore(player, "dompet", currentCoins - totalCost);
-            player.runCommandAsync(`give @s ${itemData.id} ${amount}`);
+
+            // Handling unstackable/excess item distributions properly
+            const maxStackSize = new ItemStack(itemData.id, 1).maxAmount;
+            let remaining = amount;
+
+            while (remaining > 0) {
+                let toGive = Math.min(remaining, maxStackSize);
+                let stackToGive = new ItemStack(itemData.id, toGive);
+
+                try {
+                    invComponent.container.addItem(stackToGive);
+                } catch(e) {
+                    // Fallback to dropping items on the floor if inventory randomly rejects it
+                    player.dimension.spawnItem(stackToGive, player.location);
+                }
+                remaining -= toGive;
+            }
+
             player.sendMessage(`§a[Shop] Sukses membeli §e${amount}x ${displayName} §aseharga §eRp${totalCost.toLocaleString("id-ID")}!`);
         } else {
             player.sendMessage(`§c[Shop] Rupiah lu gak cukup cuy! Butuh Rp${totalCost.toLocaleString("id-ID")}.`);
@@ -863,8 +889,8 @@ function processSellAll(player) {
     }
 
     if (hasRejectedItems) {
-        player.runCommandAsync('title @s subtitle §fAda barang ampas/biasa di tas lu!');
-        player.runCommandAsync('title @s title §c§lDITOLAK');
+        player.dimension.runCommandAsync(`title "${player.name}" subtitle §fAda barang ampas/biasa di tas lu!`);
+        player.dimension.runCommandAsync(`title "${player.name}" title §c§lDITOLAK`);
     } else if (!itemsSold) {
         player.sendMessage("§c[Shop] Tidak ada barang langka yang bisa dijual di tas lu.");
     }
@@ -891,22 +917,24 @@ world.afterEvents.entityHitEntity.subscribe((event) => {
     if (!effect || typeof effect !== 'string') return;
 
     // Execute Custom Effect Logic
-    if (effect === "poison") {
-        // 20% chance to poison target for 3 seconds
+    if (effect === "frostbite") {
+        // 20% chance to slow and slightly damage target for 3 seconds
         if (Math.random() < 0.20) {
-            target.addEffect("poison", 60, { amplifier: 0, showParticles: true });
+            target.addEffect("slowness", 60, { amplifier: 1, showParticles: true });
+            target.addEffect("weakness", 60, { amplifier: 0, showParticles: true });
         }
-    } else if (effect === "wither") {
+    } else if (effect === "abyssal_wither") {
         // 10% chance to Wither Area for 3 seconds
         if (Math.random() < 0.10) {
             target.addEffect("wither", 60, { amplifier: 1, showParticles: true });
             target.dimension.spawnParticle("minecraft:crop_growth_area_emitter", target.location);
         }
-    } else if (effect === "lightning") {
-        // 5% chance to strike lightning
+    } else if (effect === "thunderous_smite") {
+        // 5% chance to strike lightning and apply massive damage effects
         if (Math.random() < 0.05) {
             target.dimension.spawnEntity("minecraft:lightning_bolt", target.location);
-            attacker.sendMessage("§b§l[PETIR THOR] §r§fKekuatan senjata Legendary aktif!");
+            target.addEffect("slowness", 40, { amplifier: 4, showParticles: false });
+            attacker.sendMessage("§e§l[THUNDEROUS SMITE] §r§fKekuatan senjata Legendary menebas musuh!");
         }
     }
 });

@@ -87,7 +87,8 @@ export function breakBlockArea(player, originBlock, radius, typeId) {
                     });
 
                     if (targetBlock && targetBlock.typeId === typeId) {
-                        player.runCommandAsync(`setblock ${targetBlock.x} ${targetBlock.y} ${targetBlock.z} air destroy`);
+                        // Use dimension runCommandAsync to bypass player OP permissions
+                        dimension.runCommandAsync(`setblock ${targetBlock.x} ${targetBlock.y} ${targetBlock.z} air destroy`);
                         brokenCount++;
                     }
                 } catch(e) {}
@@ -113,36 +114,46 @@ export function canUseActiveSkill(playerName, skillId, cooldownMs) {
 export function applyPassiveStats(player, rpgData) {
     try {
         // Mining Level -> Haste
-        // Lvl 10 = Haste 1, Lvl 30 = Haste 2, Lvl 50 = Haste 3
-        if (rpgData.mining.level >= 10) {
-            let hasteLvl = Math.floor(rpgData.mining.level / 20);
-            if (hasteLvl > 0) player.addEffect("haste", 30, { amplifier: hasteLvl - 1, showParticles: false });
+        // Nerfed: Lvl 20 = Haste 1, Lvl 45 = Haste 2
+        if (rpgData.mining.level >= 20) {
+            let hasteLvl = rpgData.mining.level >= 45 ? 1 : 0;
+            player.addEffect("haste", 30, { amplifier: hasteLvl, showParticles: false });
         }
 
         // Slayer Level -> Health Boost & Speed
-        // Lvl 15 = Health Boost 1, Lvl 40 = Health Boost 2
-        if (rpgData.slayer.level >= 15) {
-            let hbLvl = rpgData.slayer.level >= 40 ? 1 : 0;
+        // Nerfed: Lvl 30 = Health Boost 1, Lvl 50 = Health Boost 2
+        if (rpgData.slayer.level >= 30) {
+            let hbLvl = rpgData.slayer.level >= 50 ? 1 : 0;
             player.addEffect("health_boost", 30, { amplifier: hbLvl, showParticles: false });
         }
 
         // Speed
-        if (rpgData.slayer.level >= 25) {
+        if (rpgData.slayer.level >= 35) {
             player.addEffect("speed", 30, { amplifier: 0, showParticles: false }); // Speed 1
         }
 
         // --- Gacha Passives ---
-        if (rpgData.equippedGachaPassives && rpgData.equippedGachaPassives.includes("juggernaut")) {
+        const passives = rpgData.equippedGachaPassives || [];
+
+        if (passives.includes("fortitude")) {
             player.addEffect("resistance", 30, { amplifier: 1, showParticles: false }); // Resistance 2
         }
 
-        if (rpgData.equippedGachaPassives && rpgData.equippedGachaPassives.includes("ninja")) {
-            player.addEffect("speed", 30, { amplifier: 1, showParticles: false }); // Speed 2 (Overrides Slayer Speed 1)
+        if (passives.includes("agility")) {
+            player.addEffect("speed", 30, { amplifier: 1, showParticles: false }); // Speed 2
             player.addEffect("jump_boost", 30, { amplifier: 1, showParticles: false });
         }
 
-        if (rpgData.equippedGachaPassives && rpgData.equippedGachaPassives.includes("berserker")) {
+        if (passives.includes("titans_grip")) {
             player.addEffect("strength", 30, { amplifier: 0, showParticles: false }); // Strength 1
+        }
+
+        if (passives.includes("vitality")) {
+            player.addEffect("health_boost", 30, { amplifier: 2, showParticles: false }); // Health Boost 3
+        }
+
+        if (passives.includes("regeneration")) {
+            player.addEffect("regeneration", 60, { amplifier: 0, showParticles: false }); // Regen 1
         }
     } catch(e) {}
 }

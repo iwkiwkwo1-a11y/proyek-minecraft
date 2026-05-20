@@ -44,17 +44,20 @@ export function openGachaMenu(player) {
 
 const GACHA_COST_PASSIVE = 10; // Costs 10 Cores
 
-const PASSIVE_POOL = [
-    { id: "juggernaut", name: "🛡 Juggernaut", desc: "Resistance Permanen" },
-    { id: "ninja", name: "💨 Ninja", desc: "Speed & Jump Boost Permanen" },
-    { id: "berserker", name: "⚔ Berserker", desc: "Strength Permanen" }
+export const PASSIVE_POOL = [
+    { id: "fortitude", name: "🛡 Fortitude", desc: "Resistance Permanen" },
+    { id: "agility", name: "💨 Agility", desc: "Speed & Jump Boost Permanen" },
+    { id: "titans_grip", name: "⚔ Titan's Grip", desc: "Strength Permanen" },
+    { id: "vitality", name: "❤ Vitality", desc: "Health Boost Permanen" },
+    { id: "regeneration", name: "✨ Vigor", desc: "Regen HP Perlahan" }
 ];
 
 import { getPlayerRpgData, savePlayerRpgData } from "./rpg_system.js";
 
 export function openPassiveGacha(player) {
     const objCore = world.scoreboard.getObjective("core");
-    const currentCore = objCore ? (objCore.getScore(player) || 0) : 0;
+    let currentCore = 0;
+    try { if (objCore) currentCore = objCore.getScore(player) || 0; } catch (e) {}
 
     if (currentCore < GACHA_COST_PASSIVE) {
         player.sendMessage(`§c[Gacha] Core tidak cukup! Butuh §b${GACHA_COST_PASSIVE} Core§c.`);
@@ -81,9 +84,14 @@ export function openPassiveGacha(player) {
     rpgData.unlockedGachaPassives.push(wonPassive.id);
     savePlayerRpgData(player, rpgData);
 
-    player.runCommandAsync(`summon fireworks_rocket ~ ~1 ~`);
-    player.runCommandAsync(`playsound random.levelup @s`);
-    player.runCommandAsync(`camerashake add @s 0.5 1 positional`);
+    // Server-side execution to bypass player permissions
+    const px = Math.floor(player.location.x);
+    const py = Math.floor(player.location.y);
+    const pz = Math.floor(player.location.z);
+
+    player.dimension.runCommandAsync(`summon fireworks_rocket ${px} ${py + 1} ${pz}`);
+    player.dimension.runCommandAsync(`playsound random.levelup @a[x=${px},y=${py},z=${pz},r=10]`);
+    player.dimension.runCommandAsync(`camerashake add @a[x=${px},y=${py},z=${pz},r=10] 0.5 1 positional`);
 
     world.sendMessage(`§5§l[GACHA DEWA] §r§fPemain §b${player.name} §fberhasil mendapatkan Pasif Dewa: §e${wonPassive.name}§f!`);
 }
@@ -105,10 +113,13 @@ function openConvertMenu(player) {
         const objCore = world.scoreboard.getObjective("core");
         if (!objDompet || !objCore) return;
 
-        const currentRupiah = objDompet.getScore(player) || 0;
+        let currentRupiah = 0;
+        try { currentRupiah = objDompet.getScore(player) || 0; } catch (e) {}
+
         if (currentRupiah >= cost) {
             objDompet.setScore(player, currentRupiah - cost);
-            const currentCore = objCore.getScore(player) || 0;
+            let currentCore = 0;
+            try { currentCore = objCore.getScore(player) || 0; } catch (e) {}
             objCore.setScore(player, currentCore + amount);
 
             player.sendMessage(`§a[System] Berhasil membeli §b${amount} Core §aseharga §eRp${cost.toLocaleString("id-ID")}!`);
@@ -121,10 +132,10 @@ function openConvertMenu(player) {
 const GACHA_COST_EQUIPMENT = 5; // Costs 5 Cores
 
 const RARITIES = [
-    { name: "§f[Common]", weight: 50, effect: "none" },
-    { name: "§a[Rare]", weight: 30, effect: "poison" },
-    { name: "§d[Epic]", weight: 15, effect: "wither" },
-    { name: "§6§l[Legendary]", weight: 5, effect: "lightning" }
+    { name: "§f[Common]", weight: 74.99, effect: "none" },
+    { name: "§a[Rare]", weight: 20, effect: "frostbite" },
+    { name: "§d[Epic]", weight: 5, effect: "abyssal_wither" },
+    { name: "§6§l[Legendary]", weight: 0.01, effect: "thunderous_smite" }
 ];
 
 function getRandomRarity() {
@@ -158,7 +169,8 @@ export function openEquipmentGacha(player) {
     }
 
     const objCore = world.scoreboard.getObjective("core");
-    const currentCore = objCore ? (objCore.getScore(player) || 0) : 0;
+    let currentCore = 0;
+    try { if (objCore) currentCore = objCore.getScore(player) || 0; } catch (e) {}
 
     if (currentCore < GACHA_COST_EQUIPMENT) {
         player.sendMessage(`§c[Gacha] Core tidak cukup! Butuh §b${GACHA_COST_EQUIPMENT} Core§c.`);
@@ -176,14 +188,14 @@ export function openEquipmentGacha(player) {
 
     // Update Lore to display effect
     let effectText = "";
-    if (rarity.effect === "poison") effectText = "§2Racun Level 1";
-    if (rarity.effect === "wither") effectText = "§8Wither Area";
-    if (rarity.effect === "lightning") effectText = "§bPetir Thor";
-    if (rarity.effect === "none") effectText = "§7Tidak Ada Efek Khusus";
+    if (rarity.effect === "frostbite") effectText = "§bFrostbite (Slow & Damage)";
+    if (rarity.effect === "abyssal_wither") effectText = "§8Abyssal Wither (Wither Area)";
+    if (rarity.effect === "thunderous_smite") effectText = "§eThunderous Smite (Petir OP)";
+    if (rarity.effect === "none") effectText = "§7Kosong";
 
     const newLore = [
         `§r${rarity.name}`,
-        `§r§7Kekuatan Sihir: ${effectText}`
+        `§r§7Kekuatan Gacha: ${effectText}`
     ];
     item.setLore(newLore);
 
@@ -192,13 +204,17 @@ export function openEquipmentGacha(player) {
 
     // Animations & Feedback
     if (rarity.name.includes("Epic") || rarity.name.includes("Legendary")) {
-        player.runCommandAsync(`summon fireworks_rocket ~ ~1 ~`);
-        player.runCommandAsync(`playsound random.levelup @s`);
-        player.runCommandAsync(`camerashake add @s 0.5 1 positional`);
+        const px = Math.floor(player.location.x);
+        const py = Math.floor(player.location.y);
+        const pz = Math.floor(player.location.z);
+
+        player.dimension.runCommandAsync(`summon fireworks_rocket ${px} ${py + 1} ${pz}`);
+        player.dimension.runCommandAsync(`playsound random.levelup @a[x=${px},y=${py},z=${pz},r=10]`);
+        player.dimension.runCommandAsync(`camerashake add @a[x=${px},y=${py},z=${pz},r=10] 0.5 1 positional`);
 
         world.sendMessage(`§6§l[GACHA] §r§fPemain §b${player.name} §fbaru saja mendapatkan senjata §l${rarity.name} §fberkekuatan §e${effectText}§f!`);
     } else {
         player.sendMessage(`§a[Gacha] Sukses menyihir barang! Kamu mendapatkan grade ${rarity.name}.`);
-        player.runCommandAsync(`playsound random.orb @s`);
+        player.dimension.runCommandAsync(`playsound random.orb @a[x=${Math.floor(player.location.x)},y=${Math.floor(player.location.y)},z=${Math.floor(player.location.z)},r=5]`);
     }
 }

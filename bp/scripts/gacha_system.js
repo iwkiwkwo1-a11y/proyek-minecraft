@@ -155,19 +155,6 @@ export function openEquipmentGacha(player) {
     const invComponent = player.getComponent("inventory");
     if (!invComponent) return;
     const inv = invComponent.container;
-    const selectedSlot = player.selectedSlotIndex;
-    const item = inv.getItem(selectedSlot);
-
-    if (!item) {
-        player.sendMessage("§c[Gacha] Kamu harus memegang senjata atau armor di tangan utama (Main Hand)!");
-        return;
-    }
-
-    const category = getItemCategory(item.typeId);
-    if (category === "invalid") {
-        player.sendMessage("§c[Gacha] Barang di tanganmu tidak bisa di-gacha! (Harus Senjata, Tool, atau Armor).");
-        return;
-    }
 
     const objCore = world.scoreboard.getObjective("core");
     let currentCore = 0;
@@ -178,17 +165,63 @@ export function openEquipmentGacha(player) {
         return;
     }
 
-    // Handle Reroll Confirmation Flow
-    const existingEffect = item.getDynamicProperty("gacha_effect");
-    if (existingEffect && typeof existingEffect === "string" && existingEffect !== "none") {
-        // Player already has an effect, execute reroll confirmation flow
-        executeRerollFlow(player, item, selectedSlot, inv, currentCore, objCore, category);
+    // Scan inventory for valid gear
+    const validItems = [];
+    for (let i = 0; i < inv.size; i++) {
+        const item = inv.getItem(i);
+        if (!item) continue;
+
+        const category = getItemCategory(item.typeId);
+        if (category !== "invalid") {
+            const eff = item.getDynamicProperty("gacha_effect");
+            let effName = "";
+            if (eff && typeof eff === 'string' && eff !== "none") {
+                effName = " §d(Memiliki Efek)";
+            }
+
+            // Format name nicely
+            let cleanName = item.typeId.replace("minecraft:", "").replace(/_/g, " ");
+            cleanName = cleanName.replace(/\b\w/g, l => l.toUpperCase());
+
+            validItems.push({
+                slotIndex: i,
+                item: item,
+                category: category,
+                displayName: `[Slot ${i}] ${cleanName}${effName}`
+            });
+        }
+    }
+
+    if (validItems.length === 0) {
+        player.sendMessage("§c[Gacha] Tidak ada Senjata, Tool, atau Armor yang valid di dalam tas kamu!");
         return;
     }
 
-    // Direct Gacha Flow for items without an effect
-    objCore.setScore(player, currentCore - GACHA_COST_EQUIPMENT);
-    applyGachaResult(player, item, selectedSlot, inv, category);
+    const form = new ModalFormData();
+    form.title("§d[ Pilih Equipment ]");
+
+    const options = validItems.map(v => v.displayName);
+    form.dropdown("Pilih barang yang ingin disihir:\n§7Harga: 5 Core", options);
+
+    form.show(player).then(res => {
+        if (res.canceled) return;
+
+        const selected = validItems[res.formValues[0]];
+        const slot = selected.slotIndex;
+        const item = selected.item;
+        const category = selected.category;
+
+        // Handle Reroll Confirmation Flow
+        const existingEffect = item.getDynamicProperty("gacha_effect");
+        if (existingEffect && typeof existingEffect === "string" && existingEffect !== "none") {
+            executeRerollFlow(player, item, slot, inv, currentCore, objCore, category);
+            return;
+        }
+
+        // Direct Gacha Flow for items without an effect
+        objCore.setScore(player, currentCore - GACHA_COST_EQUIPMENT);
+        applyGachaResult(player, item, slot, inv, category);
+    });
 }
 
 function executeRerollFlow(player, item, slotIndex, inv, currentCore, objCore, category) {
@@ -212,7 +245,7 @@ function executeRerollFlow(player, item, slotIndex, inv, currentCore, objCore, c
         // Deduct core regardless of choice
         objCore.setScore(player, currentCore - GACHA_COST_EQUIPMENT);
 
-        if (res.selection === 1) { // Ganti
+        if (res.selection === 0) { // Ya, Ganti (button1 = 0)
             item.setDynamicProperty("gacha_effect", newEffectData.id);
             const newLore = [
                 `§r${rarity.name}`,

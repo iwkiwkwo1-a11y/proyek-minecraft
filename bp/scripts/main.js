@@ -1,4 +1,4 @@
-import { world, system, ItemStack, ItemLockMode, EnchantmentTypes } from "@minecraft/server";
+import { world, system, ItemStack, ItemLockMode, EnchantmentTypes, DisplaySlotId, ObjectiveSortOrder } from "@minecraft/server";
 import { ActionFormData, ModalFormData } from "@minecraft/server-ui";
 import { EconomyConfig } from "./economy_config.js";
 import { getPlayerRpgData, getXpRequired, generateXpBar, applyPassiveStats, addXp, breakBlockArea, canUseActiveSkill, savePlayerRpgData } from "./rpg_system.js";
@@ -9,12 +9,21 @@ import { openTrollMenu } from "./troll_system.js";
 // Initialize Objective
 system.run(() => {
     try {
-        if (!world.scoreboard.getObjective("dompet")) {
-            world.scoreboard.addObjective("dompet", "§e§lPRO SURVIVAL");
+        let dompetObj = world.scoreboard.getObjective("dompet");
+        if (!dompetObj) {
+            dompetObj = world.scoreboard.addObjective("dompet", "§e§lPRO SURVIVAL");
         }
         if (!world.scoreboard.getObjective("core")) {
             world.scoreboard.addObjective("core", "§b§lCORE");
         }
+        if (!world.scoreboard.getObjective("top_sultan")) {
+            world.scoreboard.addObjective("top_sultan", "§6§lTOP 5 SULTAN");
+        }
+
+        world.scoreboard.setObjectiveAtDisplaySlot(DisplaySlotId.Sidebar, {
+            objective: world.scoreboard.getObjective("top_sultan"),
+            sortOrder: ObjectiveSortOrder.Descending
+        });
     } catch (e) {
         // Ignore if it already exists or errors
     }
@@ -82,6 +91,39 @@ function setScore(player, objectiveId, score) {
 const hiddenBoards = new Map();
 
 system.runInterval(() => {
+    // Top 5 Sultan Leaderboard Logic
+    try {
+        const dompetObj = world.scoreboard.getObjective("dompet");
+        const topSultanObj = world.scoreboard.getObjective("top_sultan");
+
+        if (dompetObj && topSultanObj) {
+            // Clear old scores to prevent stale offline players from lingering forever if desired,
+            // but for a persistent economy, we just overwrite active scores.
+            // Since FakePlayer participants can't be easily wiped individually without wiping all,
+            // we recreate the objective every interval to refresh the top 5 cleanly.
+            world.scoreboard.removeObjective("top_sultan");
+            const freshTop = world.scoreboard.addObjective("top_sultan", "§6§lTOP 5 SULTAN");
+
+            world.scoreboard.setObjectiveAtDisplaySlot(DisplaySlotId.Sidebar, {
+                objective: freshTop,
+                sortOrder: ObjectiveSortOrder.Descending
+            });
+
+            const scores = dompetObj.getScores();
+            // Filter to only Player type if necessary, and sort descending
+            scores.sort((a, b) => b.score - a.score);
+
+            const maxDisplay = Math.min(5, scores.length);
+            for (let i = 0; i < maxDisplay; i++) {
+                const sInfo = scores[i];
+                const displayName = sInfo.participant.displayName;
+                // Add invisible formatting codes to prevent duplicate name errors
+                const rankName = `§f${i + 1}. §b${displayName}${"§r".repeat(i)}`;
+                freshTop.setScore(rankName, sInfo.score);
+            }
+        }
+    } catch (e) {}
+
     const players = world.getAllPlayers();
     const online = players.length;
     for (const player of players) {
@@ -761,42 +803,80 @@ function openTopKoinMenu(player) {
 }
 
 function formatItemName(id) {
-    // Converts "minecraft:apple" to "Apple"
     const name = id.replace("minecraft:", "").replace(/_/g, " ");
     return name.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-function openBuyMenu(player) {
+function getIconPath(id) {
+    const cleanName = id.replace("minecraft:", "");
+    // Simplistic heuristic for standard Bedrock vanilla paths
+    if (cleanName.includes("log") || cleanName.includes("dirt") || cleanName.includes("sand") || cleanName.includes("stone") || cleanName.includes("block") || cleanName.includes("obsidian") || cleanName.includes("glass") || cleanName.includes("basalt") || cleanName.includes("ice") || cleanName.includes("ore")) {
+        return `textures/blocks/${cleanName}`;
+    }
+    return `textures/items/${cleanName}`;
+}
+
+function openBuyMenu(player, page = 0) {
     const secondsLeft = Math.ceil((nextRefreshTime - Date.now()) / 1000);
+    const snapshot = [...currentShopItems]; // Ensure stable array length
+
+    const itemsPerPage = 10;
+    const totalPages = Math.ceil(snapshot.length / itemsPerPage);
+    const startIdx = page * itemsPerPage;
+    const endIdx = Math.min(startIdx + itemsPerPage, snapshot.length);
+
+    const pageItems = snapshot.slice(startIdx, endIdx);
+
     const form = new ActionFormData();
-    form.title("§1[ Toko Dinamis ]");
+    form.title(`§1[ Toko Dinamis | Halaman ${page + 1}/${totalPages} ]`);
     form.body(`§eSisa Waktu Refresh: §f${secondsLeft} detik\n§7Barang-barang ini akan berubah secara acak!`);
 
-    // Create buttons for current shop items
-    // Since currentShopItems might be updated if timer hits while form is open,
-    // we take a local snapshot to avoid out-of-bounds selection errors.
-    const snapshot = [...currentShopItems];
-
-    for (const item of snapshot) {
+    for (const item of pageItems) {
         const displayName = formatItemName(item.id);
         const priceStr = formatRupiah(item.price);
+        const iconPath = getIconPath(item.id);
+
         if (item.isOP) {
-            form.button(`§d§l[OP] ${displayName}§r\n§e${priceStr}`);
+            form.button(`§d§l[OP] ${displayName}§r\n§e${priceStr}`, iconPath);
         } else {
-            form.button(`§f${displayName}\n§e${priceStr}`);
+            form.button(`§f${displayName}\n§e${priceStr}`, iconPath);
         }
     }
+
+    // Pagination Controls
+    if (page > 0) form.button("§e<- Halaman Sebelumnya");
+    if (page < totalPages - 1) form.button("§eHalaman Selanjutnya ->");
+
     form.button("§cKembali");
 
     form.show(player).then((response) => {
         if (response.canceled) return;
-        if (response.selection === snapshot.length) {
-            openMainMenu(player);
+
+        let selection = response.selection;
+
+        // Item clicked
+        if (selection < pageItems.length) {
+            openBuyAmountMenu(player, pageItems[selection]);
             return;
         }
 
-        const selectedItem = snapshot[response.selection];
-        openBuyAmountMenu(player, selectedItem);
+        // Handle control buttons
+        selection -= pageItems.length;
+
+        if (page > 0 && selection === 0) {
+            openBuyMenu(player, page - 1);
+            return;
+        }
+
+        if (page > 0) selection -= 1; // offset if previous button existed
+
+        if (page < totalPages - 1 && selection === 0) {
+            openBuyMenu(player, page + 1);
+            return;
+        }
+
+        // Must be the "Kembali" button
+        openMainMenu(player);
     });
 }
 

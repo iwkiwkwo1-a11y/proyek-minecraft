@@ -4,12 +4,12 @@ import { formatRupiah, getUiHeader } from "./utils.js";
 
 // Rank definitions from lowest (index 0) to highest
 export const RANKS = [
-    { id: 0, badge: "§7[Warga Biasa]", name: "Warga Biasa", cost: 0, discount: 0 },
-    { id: 1, badge: "§a[Pedagang]", name: "Pedagang", cost: 5000000, discount: 0.05 }, // 5M cost, 5% discount
-    { id: 2, badge: "§b[Juragan]", name: "Juragan", cost: 25000000, discount: 0.10 }, // 25M cost, 10% discount
-    { id: 3, badge: "§d[Miliarder]", name: "Miliarder", cost: 100000000, discount: 0.15 }, // 100M cost, 15% discount
-    { id: 4, badge: "§e§l[SULTAN]", name: "Sultan", cost: 500000000, discount: 0.20 }, // 500M cost, 20% discount
-    { id: 5, badge: "§6§l[KONGLOMERAT]", name: "Konglomerat", cost: 2000000000, discount: 0.25 } // 2B cost, 25% discount
+    { id: 0, badge: "§7[Warga Biasa]", shortBadge: "§7[W]", name: "Warga Biasa", cost: 0, discount: 0 },
+    { id: 1, badge: "§a[Pedagang]", shortBadge: "§a[P]", name: "Pedagang", cost: 5000000, discount: 0.05 }, // 5M cost, 5% discount
+    { id: 2, badge: "§b[Juragan]", shortBadge: "§b[J]", name: "Juragan", cost: 25000000, discount: 0.10 }, // 25M cost, 10% discount
+    { id: 3, badge: "§d[Miliarder]", shortBadge: "§d[M]", name: "Miliarder", cost: 100000000, discount: 0.15 }, // 100M cost, 15% discount
+    { id: 4, badge: "§e§l[SULTAN]", shortBadge: "§e§l[S]", name: "Sultan", cost: 500000000, discount: 0.20 }, // 500M cost, 20% discount
+    { id: 5, badge: "§6§l[KONGLOMERAT]", shortBadge: "§6§l[K]", name: "Konglomerat", cost: 2000000000, discount: 0.25 } // 2B cost, 25% discount
 ];
 
 export function getPlayerRank(player) {
@@ -60,7 +60,9 @@ export function openRankMenu(player) {
             processRankUpgrade(player, currentRank, nextRank);
         } else {
             // "Kembali ke Menu Utama" button was clicked (either index 1 if nextRank exists, or index 0 if maxed)
-            import("./main.js").then(mod => mod.openMainMenu(player)).catch(()=>{});
+            import("./main.js").then(mod => {
+                system.runTimeout(() => { mod.openMainMenu(player); }, 5);
+            }).catch(()=>{});
         }
     });
 }

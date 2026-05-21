@@ -56,7 +56,9 @@ export function openTeleportMenu(player) {
         if (res.selection === 0) executeRTP(player);
         else if (res.selection === 1) openHomeMenu(player);
         else if (res.selection === 2) {
-            import("./main.js").then(mod => mod.openMainMenu(player)).catch(()=>{});
+            import("./main.js").then(mod => {
+                system.runTimeout(() => { mod.openMainMenu(player); }, 5);
+            }).catch(()=>{});
         }
     });
 }

@@ -119,10 +119,10 @@ system.runInterval(() => {
                 const sInfo = scores[i];
                 const displayName = sInfo.participant.displayName;
 
-                let badge = "§7[Warga Biasa]"; // fallback
+                let badge = "§7[W]"; // fallback short badge
                 const pTarget = world.getAllPlayers().find(p => p.name === displayName);
                 if (pTarget) {
-                    badge = getPlayerRank(pTarget).badge;
+                    badge = getPlayerRank(pTarget).shortBadge;
                 }
 
                 // Add invisible formatting codes to prevent duplicate name errors
@@ -373,7 +373,9 @@ function openInboxMenu(player) {
     if (inbox.length === 0) {
         form.body(`${getUiHeader(player)}\n§7Kotak masuk Anda kosong.`);
         form.button("§cKembali");
-        form.show(player).then(() => openMainMenu(player));
+        form.show(player).then(() => {
+            system.runTimeout(() => { openMainMenu(player); }, 5);
+        });
         return;
     }
 
@@ -454,7 +456,9 @@ function openRpgMenu(player) {
             player.sendMessage(`§a[RPG] Mode Hancur 3x3 sekarang ${rpgData.enable3x3 ? "NYALA" : "MATI"}.`);
             openRpgMenu(player);
         }
-        else if (res.selection === 3) openMainMenu(player);
+        else if (res.selection === 3) {
+            system.runTimeout(() => { openMainMenu(player); }, 5);
+        }
     });
 }
 
@@ -951,7 +955,7 @@ function openBuyMenu(player, page = 0) {
         }
 
         // Must be the "Kembali" button
-        openMainMenu(player);
+        system.runTimeout(() => { openMainMenu(player); }, 5);
     });
 }
 
@@ -1221,7 +1225,7 @@ function openSellChoiceMenu(player) {
         } else if (res.selection === 1) {
             openManualSellMenu(player);
         } else if (res.selection === 2) {
-            openMainMenu(player);
+            system.runTimeout(() => { openMainMenu(player); }, 5);
         }
     });
 }

@@ -41,6 +41,11 @@ export function openGachaMenu(player) {
         if (res.selection === 0) openConvertMenu(player);
         else if (res.selection === 1) openEquipmentGacha(player);
         else if (res.selection === 2) openPassiveGacha(player);
+        else if (res.selection === 3) {
+            import("./main.js").then(mod => {
+                system.runTimeout(() => { mod.openMainMenu(player); }, 5);
+            }).catch(()=>{});
+        }
     });
 }
 

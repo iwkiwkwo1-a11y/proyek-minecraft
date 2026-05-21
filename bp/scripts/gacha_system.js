@@ -54,7 +54,8 @@ export const PASSIVE_POOL = [
     { id: "vitality", name: "❤ Vitality", desc: "Health Boost Permanen" },
     { id: "regeneration", name: "✨ Vigor", desc: "Regen HP Perlahan" },
     { id: "phoenix_blood", name: "🔥 Phoenix Blood (Legendary)", desc: "Regen deras saat HP sekarat" },
-    { id: "adrenaline", name: "⚡ Adrenaline (Legendary)", desc: "Speed gila saat HP sekarat" }
+    { id: "adrenaline", name: "⚡ Adrenaline (Legendary)", desc: "Speed gila saat HP sekarat" },
+    { id: "second_wind", name: "🌟 Second Wind (Legendary)", desc: "Revive setengah HP dari kematian" }
 ];
 
 export function openPassiveGacha(player) {
@@ -63,7 +64,7 @@ export function openPassiveGacha(player) {
     try { if (objCore) currentCore = objCore.getScore(player) || 0; } catch (e) {}
 
     if (currentCore < GACHA_COST_PASSIVE) {
-        player.sendMessage(`§c[Gacha] Core tidak cukup! Butuh §b${GACHA_COST_PASSIVE} Core§c.`);
+        player.sendMessage(`§c[Gacha] Core tidak mencukupi! Diperlukan §b${GACHA_COST_PASSIVE} Core§c.`);
         return;
     }
 
@@ -127,7 +128,7 @@ function openConvertMenu(player) {
 
             player.sendMessage(`§a[System] Berhasil membeli §b${amount} Core §aseharga §e${formatRupiah(cost)}!`);
         } else {
-            player.sendMessage(`§c[System] Rupiah kamu tidak cukup! Butuh ${formatRupiah(cost)}.`);
+            player.sendMessage(`§c[System] Saldo Rupiah Anda tidak mencukupi. Diperlukan ${formatRupiah(cost)}.`);
         }
     });
 }
@@ -161,7 +162,7 @@ export function openEquipmentGacha(player) {
     try { if (objCore) currentCore = objCore.getScore(player) || 0; } catch (e) {}
 
     if (currentCore < GACHA_COST_EQUIPMENT) {
-        player.sendMessage(`§c[Gacha] Core tidak cukup! Butuh §b${GACHA_COST_EQUIPMENT} Core§c.`);
+        player.sendMessage(`§c[Gacha] Core tidak mencukupi! Diperlukan §b${GACHA_COST_EQUIPMENT} Core§c.`);
         return;
     }
 
@@ -193,7 +194,7 @@ export function openEquipmentGacha(player) {
     }
 
     if (validItems.length === 0) {
-        player.sendMessage("§c[Gacha] Tidak ada Senjata, Tool, atau Armor yang valid di dalam tas kamu!");
+        player.sendMessage("§c[Gacha] Tidak ada Senjata atau Armor yang valid di dalam Inventory.");
         return;
     }
 
@@ -256,7 +257,7 @@ function executeRerollFlow(player, item, slotIndex, inv, currentCore, objCore, c
 
             triggerGachaAnimations(player, rarity, newEffectData);
         } else {
-            player.sendMessage("§e[Gacha] Kamu memilih mempertahankan kekuatan lama.");
+            player.sendMessage("§e[Gacha] Kekuatan lama berhasil dipertahankan.");
         }
     });
 }
@@ -288,7 +289,7 @@ function triggerGachaAnimations(player, rarity, effectData) {
 
         world.sendMessage(`§6§l[GACHA] §r§fPemain §b${player.name} §fbaru saja mendapatkan sihir §l${rarity.name} §e${effectData.name}§f!`);
     } else {
-        player.sendMessage(`§a[Gacha] Sukses menyihir barang! Kamu mendapatkan grade ${rarity.name}.`);
+        player.sendMessage(`§a[Gacha] Berhasil menyihir barang! Anda mendapatkan grade ${rarity.name}.`);
         player.dimension.runCommandAsync(`playsound random.orb @a[x=${Math.floor(player.location.x)},y=${Math.floor(player.location.y)},z=${Math.floor(player.location.z)},r=5]`);
     }
 }

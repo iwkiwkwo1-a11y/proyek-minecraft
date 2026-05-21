@@ -1,6 +1,7 @@
 // gacha_effects.js
 
 export const WEAPON_EFFECTS = [
+    { id: "serrated_edge", name: "Serrated Edge", type: "weapon", rarity: "Common", desc: "Peluang extra damage kecil (Wither 1dtk)." },
     { id: "poison_1", name: "Venom Strike", type: "weapon", rarity: "Rare", desc: "Peluang meracuni target." },
     { id: "frostbite", name: "Frostbite", type: "weapon", rarity: "Rare", desc: "Peluang slow dan weakness." },
     { id: "sonic_boom", name: "Sonic Boom", type: "weapon", rarity: "Rare", desc: "Knockback ekstrim ke target." },
@@ -8,21 +9,26 @@ export const WEAPON_EFFECTS = [
     { id: "abyssal_wither", name: "Abyssal Wither", type: "weapon", rarity: "Epic", desc: "Ledakan area wither." },
     { id: "blindness_strike", name: "Shadow Strike", type: "weapon", rarity: "Epic", desc: "Membutakan musuh sementara." },
     { id: "levitation_hit", name: "Gravity Smash", type: "weapon", rarity: "Epic", desc: "Menerbangkan musuh ke udara." },
+    { id: "phantom_blade", name: "Phantom Blade", type: "weapon", rarity: "Epic", desc: "Peluang serangan area mematikan." },
     { id: "thunderous_smite", name: "Thunderous Smite", type: "weapon", rarity: "Legendary", desc: "Sambar petir mematikan." },
     { id: "vampiric", name: "Vampiric Touch", type: "weapon", rarity: "Legendary", desc: "Lifesteal deras." },
-    { id: "explosive_blow", name: "Explosive Blow", type: "weapon", rarity: "Legendary", desc: "Ledakan area saat memukul." }
+    { id: "explosive_blow", name: "Explosive Blow", type: "weapon", rarity: "Legendary", desc: "Ledakan area saat memukul." },
+    { id: "void_strike", name: "Void Strike", type: "weapon", rarity: "Legendary", desc: "Mengikis Max HP musuh perlahan." }
 ];
 
 export const HELMET_EFFECTS = [
+    { id: "padded_helm", name: "Padded Armor", type: "helmet", rarity: "Common", desc: "Mengurangi sedikit noise (Stealth)." },
     { id: "clear_mind", name: "Clear Mind", type: "helmet", rarity: "Rare", desc: "Mencegah efek kebutaan." },
     { id: "aqua_lung", name: "Gills of Atlantis", type: "helmet", rarity: "Epic", desc: "Water Breathing Permanen." },
     { id: "third_eye", name: "Third Eye", type: "helmet", rarity: "Legendary", desc: "Night Vision & Glowing Mobs." }
 ];
 
 export const CHEST_EFFECTS = [
+    { id: "padded_chest", name: "Padded Armor", type: "chest", rarity: "Common", desc: "Extra pertahanan dasar." },
     { id: "iron_skin", name: "Iron Skin", type: "chest", rarity: "Rare", desc: "Resistance 1." },
     { id: "turtle_shell", name: "Turtle Shell", type: "chest", rarity: "Epic", desc: "Resistance 2 & Slowness." },
-    { id: "troll_blood", name: "Troll Blood", type: "chest", rarity: "Legendary", desc: "Regenerasi HP 1 Permanen." }
+    { id: "troll_blood", name: "Troll Blood", type: "chest", rarity: "Legendary", desc: "Regenerasi HP 1 Permanen." },
+    { id: "titans_aegis", name: "Titan's Aegis", type: "chest", rarity: "Legendary", desc: "Anti-Knockback, Resistance 3, Slowness 2." }
 ];
 
 export const LEG_EFFECTS = [
@@ -32,8 +38,10 @@ export const LEG_EFFECTS = [
 ];
 
 export const BOOT_EFFECTS = [
+    { id: "light_boots", name: "Lightweight", type: "boots", rarity: "Common", desc: "Sedikit lebih gesit." },
     { id: "swift_step", name: "Swiftness", type: "boots", rarity: "Rare", desc: "Speed 1." },
     { id: "frog_jump", name: "Frog Leap", type: "boots", rarity: "Epic", desc: "Jump Boost 2." },
+    { id: "featherlight", name: "Featherlight", type: "boots", rarity: "Epic", desc: "Slow Falling / Anti Fall Damage." },
     { id: "hermes_boots", name: "Boots of Hermes", type: "boots", rarity: "Legendary", desc: "Speed 3 & Jump 3." }
 ];
 

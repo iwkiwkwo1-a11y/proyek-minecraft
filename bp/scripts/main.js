@@ -237,7 +237,7 @@ world.afterEvents.playerSpawn.subscribe((event) => {
                     inventory.setItem(emptySlot, slot8Item);
                     inventory.setItem(8, clock);
                 } else {
-                    player.sendMessage("§c[System] Tas lu penuh, gabisa ngasih Jam Menu Utama! Kosongin slot dulu, cuy.");
+                    player.sendMessage("§c[System] Inventory Anda penuh. Gagal memberikan Jam Menu Utama.");
                 }
             } else {
                 inventory.setItem(8, clock);
@@ -283,7 +283,7 @@ world.beforeEvents.itemUse.subscribe((event) => {
 function openGuideBook(player) {
     const form = new ActionFormData();
     form.title("§a§lBuku Panduan Server");
-    form.body("Selamat datang di Server Survival PRO!\n\n§e[1] Toko Dinamis & Jual Barang§f\nJam Menu Utama memutar 30 barang acak (ada barang OP juga!) setiap 1 menit. Jual hasil panen dan tambangmu untuk mendapatkan Rupiah.\n\n§e[2] RPG & Leveling§f\nDapatkan XP dengan nambang (Mining), nebang pohon (Woodcutting), dan bunuh monster (Slayer). Kumpulkan Skill Point (SP) untuk beli skill aktif di Menu RPG!\n\n§e[3] Gacha & Core§f\nTukar Rupiah menjadi Core. Gunakan Core untuk gacha Pasif Dewa permanen, atau gacha sihir kekuatan pada senjata utamamu!\n\n§e[4] Kelola Skill§f\nKamu maksimal hanya bisa memakai 2 Skill Aktif RPG dan 3 Pasif Gacha secara bersamaan. Atur kombinasimu di menu 'Kelola Semua Skill'.\n\nSelamat bermain dan semoga sukses, cuy!");
+    form.body("Selamat datang di Server Survival PRO!\n\n§e[1] Toko Dinamis & Jual Barang§f\nJam Menu Utama memutar 30 barang acak (ada barang OP juga!) setiap 1 menit. Jual hasil panen dan tambangmu untuk mendapatkan Rupiah.\n\n§e[2] RPG & Leveling§f\nDapatkan XP dengan nambang (Mining), nebang pohon (Woodcutting), dan bunuh monster (Slayer). Kumpulkan Skill Point (SP) untuk beli skill aktif di Menu RPG!\n\n§e[3] Gacha & Core§f\nTukar Rupiah menjadi Core. Gunakan Core untuk gacha Pasif Dewa permanen, atau gacha sihir kekuatan pada senjata utamamu!\n\n§e[4] Kelola Skill§f\nKamu maksimal hanya bisa memakai 2 Skill Aktif RPG dan 3 Pasif Gacha secara bersamaan. Atur kombinasimu di menu 'Kelola Semua Skill'.\n\nSelamat bermain dan semoga sukses!");
     form.button("§cTutup");
     form.show(player);
 }
@@ -299,7 +299,7 @@ function openMainMenu(player) {
     form.button("§6§lTop Sultan\n§7Peringkat pemain terkaya");
     form.button("§d§lMenu RPG & Skill\n§7Level & Kemampuan Aktif");
     form.button("§5§lGacha & Core\n§7Sihir Senjata & Pasif Dewa");
-    form.button("§4§lTroll Pemain\n§7Jahilin temanmu (Rp1 Juta)");
+    form.button("§4§lTroll Pemain\n§7Berikan kejutan ke pemain lain (Rp1 Juta)");
 
     form.show(player).then((response) => {
         if (response.canceled) return;
@@ -535,7 +535,7 @@ function openTransferMenu(player) {
 
         const currentCoins = getScore(player, "dompet");
         if (currentCoins < amount) {
-            player.sendMessage("§c[System] Rupiah lu gak cukup buat transfer segitu, cuy!");
+            player.sendMessage("§c[System] Saldo Rupiah Anda tidak mencukupi untuk transfer!");
             return;
         }
 
@@ -618,7 +618,7 @@ function openSetBountyMenu(player) {
 
         const currentCoins = getScore(player, "dompet");
         if (currentCoins < amount) {
-            player.sendMessage("§c[System] Rupiah lu gak cukup buat masang bounty segitu!");
+            player.sendMessage("§c[System] Saldo Rupiah Anda tidak mencukupi untuk memasang Bounty!");
             return;
         }
 
@@ -886,7 +886,7 @@ function openBuyAmountMenu(player, itemData) {
     const priceStr = formatRupiah(itemData.price);
 
     form.title("§a[ Beli Barang ]");
-    form.slider(`Berapa banyak §e${displayName} §fyang ingin kamu beli?\n§7Harga Satuan: ${priceStr}`, 1, 64, 1, 1);
+    form.slider(`Tentukan jumlah §e${displayName} §fyang ingin kamu beli?\n§7Harga Satuan: ${priceStr}`, 1, 64, 1, 1);
 
     form.show(player).then((response) => {
         if (response.canceled) return;
@@ -898,7 +898,7 @@ function openBuyAmountMenu(player, itemData) {
         if (currentCoins >= totalCost) {
             const invComponent = player.getComponent("inventory");
             if (!invComponent || !invComponent.container) {
-                player.sendMessage("§c[Shop] Gagal mengakses inventory kamu!");
+                player.sendMessage("§c[Shop] Gagal mengakses Inventory Anda!");
                 return;
             }
 
@@ -907,7 +907,7 @@ function openBuyAmountMenu(player, itemData) {
 
             // Hard check to prevent dropping items as entities and lagging the server
             if (invComponent.container.emptySlotsCount < slotsNeeded) {
-                player.sendMessage(`§c[Shop] Tas lu gak cukup buat nampung barang ini cuy! Butuh ${slotsNeeded} slot kosong.`);
+                player.sendMessage(`§c[Shop] Inventory Anda tidak memiliki cukup ruang! DiperAndakan ${slotsNeeded} slot kosong.`);
                 return;
             }
 
@@ -926,7 +926,7 @@ function openBuyAmountMenu(player, itemData) {
 
             player.sendMessage(`§a[Shop] Sukses membeli §e${amount}x ${displayName} §aseharga §e${formatRupiah(totalCost)}!`);
         } else {
-            player.sendMessage(`§c[Shop] Rupiah lu gak cukup cuy! Butuh ${formatRupiah(totalCost)}.`);
+            player.sendMessage(`§c[Shop] Saldo Rupiah Anda tidak mencukupi. DiperAndakan ${formatRupiah(totalCost)}.`);
         }
     });
 }
@@ -975,10 +975,10 @@ function processSellAll(player) {
     }
 
     if (hasRejectedItems) {
-        player.dimension.runCommandAsync(`title "${player.name}" subtitle §fAda barang ampas/biasa di tas lu!`);
+        player.dimension.runCommandAsync(`title "${player.name}" subtitle §fTerdapat barang biasa di dalam Inventory.`);
         player.dimension.runCommandAsync(`title "${player.name}" title §c§lDITOLAK`);
     } else if (!itemsSold) {
-        player.sendMessage("§c[Shop] Tidak ada barang langka yang bisa dijual di tas lu.");
+        player.sendMessage("§c[Shop] Tidak ada barang langka yang dapat dijual di dalam Inventory.");
     }
 }
 
@@ -1060,5 +1060,56 @@ function executeWeaponEffect(effect, attacker, target) {
             // Custom damage bypass trick
             target.addEffect("instant_damage", 1, { amplifier: 1, showParticles: false });
         }
+    } else if (effect === "phantom_blade") {
+        if (Math.random() < 0.10) {
+            // Sweep attack approximation
+            target.dimension.runCommandAsync(`damage @e[x=${target.location.x},y=${target.location.y},z=${target.location.z},r=3,rm=0.1] 5 entity_attack entity "${attacker.id}"`);
+            target.dimension.spawnParticle("minecraft:sweep_attack_emitter", target.location);
+        }
+    } else if (effect === "void_strike") {
+        if (Math.random() < 0.05) {
+            target.addEffect("fatal_poison", 100, { amplifier: 1, showParticles: true }); // Fatal poison eats to 0 HP
+            attacker.sendMessage("§5§l[VOID STRIKE] §r§fEnergi kehidupan target terserap!");
+        }
     }
 }
+
+// Global cooldown map for Second Wind
+const secondWindCooldowns = new Map();
+
+// Hook into entityHurt (which triggers after damage is calculated but before death)
+world.afterEvents.entityHurt.subscribe((event) => {
+    const target = event.hurtEntity;
+    if (!target || target.typeId !== "minecraft:player") return;
+
+    const hpComp = target.getComponent("health");
+    if (!hpComp) return;
+
+    // Check if the hit was lethal
+    if (hpComp.currentValue <= 0) {
+        const rpgData = getPlayerRpgData(target);
+        const passives = rpgData.equippedGachaPassives || [];
+
+        if (passives.includes("second_wind")) {
+            const lastProc = secondWindCooldowns.get(target.name) || 0;
+            // 10 Minute Cooldown (600000 ms)
+            if (Date.now() - lastProc > 600000) {
+                secondWindCooldowns.set(target.name, Date.now());
+
+                // Revive player to 50% HP
+                hpComp.setCurrentValue(Math.max(1, Math.floor(hpComp.effectiveMax / 2)));
+
+                // Give clutch buffs
+                target.addEffect("resistance", 100, { amplifier: 2, showParticles: true }); // Res 3 for 5s
+                target.addEffect("regeneration", 100, { amplifier: 2, showParticles: true }); // Regen 3 for 5s
+                target.addEffect("absorption", 100, { amplifier: 1, showParticles: true }); // Absorption 2 for 5s
+
+                // VFX
+                target.dimension.spawnParticle("minecraft:totem_particle", target.location);
+                target.dimension.runCommandAsync(`playsound random.totem @a[x=${target.location.x},y=${target.location.y},z=${target.location.z},r=15]`);
+
+                target.sendMessage("§e§l[SECOND WIND] §r§fKekuatan Gacha menyelamatkan nyawa Anda dari kematian fatal!");
+            }
+        }
+    }
+});

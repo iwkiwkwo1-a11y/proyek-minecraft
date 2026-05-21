@@ -52,7 +52,7 @@ export function openTrollMenu(player) {
 
         const currentRupiah = getScore(player, "dompet");
         if (currentRupiah < TROLL_COST) {
-            player.sendMessage(`§c[Troll] Rupiah lu gak cukup cuy! Butuh ${formatRupiah(TROLL_COST)}.`);
+            player.sendMessage(`§c[Troll] Saldo Rupiah Anda tidak mencukupi! Butuh ${formatRupiah(TROLL_COST)}.`);
             return;
         }
 

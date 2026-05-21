@@ -169,9 +169,12 @@ system.runInterval(() => {
 
 // Command handling via /scriptevent since chatSend is not in stable v1.13.0
 // Players can type: /scriptevent ekonomi:hideboard or /scriptevent ekonomi:showboard
+import { handleQuizAnswer } from "./quiz_system.js";
+
 system.afterEvents.scriptEventReceive.subscribe((event) => {
     const id = event.id;
     const player = event.sourceEntity;
+    const message = event.message;
 
     // We only process if it's from a player
     if (!player || player.typeId !== "minecraft:player") return;
@@ -185,6 +188,18 @@ system.afterEvents.scriptEventReceive.subscribe((event) => {
         player.sendMessage("§a[System] Actionbar ditampilkan.");
     }
 }, { namespaces: ["ekonomi"] });
+
+system.afterEvents.scriptEventReceive.subscribe((event) => {
+    const id = event.id;
+    const player = event.sourceEntity;
+    const message = event.message;
+
+    if (!player || player.typeId !== "minecraft:player") return;
+
+    if (id === "jawab:kuis") {
+        handleQuizAnswer(player, message);
+    }
+}, { namespaces: ["jawab"] });
 
 // Give Shop Clock and Starter Pack on Spawn
 world.afterEvents.playerSpawn.subscribe((event) => {
@@ -586,9 +601,70 @@ function openEquipUnifiedMenu(player) {
 
 
 function openTransferMenu(player) {
-    const form = new ModalFormData();
+    const form = new ActionFormData();
     form.title("§b[ Transfer Rupiah ]");
-    form.textField("Nama Pemain Target (Bisa Offline):", "Ketik nama lengkap pemain");
+    form.body(`${getUiHeader(player)}\n§7Pilih metode pengiriman Rupiah Anda.`);
+    form.button("§aPemain Online\n§7Pilih dari daftar pemain", "textures/ui/FriendsIcon");
+    form.button("§cPemain Offline\n§7Ketik nama secara manual", "textures/ui/icon_multiplayer");
+    form.button("§cKembali", "textures/ui/cancel");
+
+    form.show(player).then(res => {
+        if (res.canceled) return;
+        if (res.selection === 0) openOnlineTransferMenu(player);
+        else if (res.selection === 1) openOfflineTransferMenu(player);
+        else if (res.selection === 2) system.runTimeout(() => { openMainMenu(player); }, 5);
+    });
+}
+
+function openOnlineTransferMenu(player) {
+    const onlinePlayers = world.getAllPlayers().filter(p => p.name !== player.name);
+    if (onlinePlayers.length === 0) {
+        player.sendMessage("§c[System] Tidak ada pemain lain yang online saat ini.");
+        return;
+    }
+
+    const playerNames = onlinePlayers.map(p => p.name);
+    const form = new ModalFormData();
+    form.title("§a[ Transfer Online ]");
+    form.dropdown("Pilih Pemain:", playerNames);
+    form.textField("Jumlah Rupiah:", "Contoh: 100000");
+    form.textField("Pesan Tambahan (Opsional):", "Contoh: Bayar utang kemarin");
+
+    form.show(player).then((response) => {
+        if (response.canceled) return;
+
+        const targetPlayerName = playerNames[response.formValues[0]];
+        const amountStr = response.formValues[1];
+        const amount = parseInt(amountStr);
+        const customMessage = response.formValues[2].trim() || "Transfer dari teman";
+
+        if (isNaN(amount) || amount <= 0) {
+            player.sendMessage("§c[System] Jumlah Rupiah tidak valid!");
+            return;
+        }
+
+        const currentCoins = getScore(player, "dompet");
+        if (currentCoins < amount) {
+            player.sendMessage("§c[System] Saldo Rupiah Anda tidak mencukupi untuk transfer!");
+            return;
+        }
+
+        setScore(player, "dompet", currentCoins - amount);
+
+        const targetPlayer = world.getAllPlayers().find(p => p.name === targetPlayerName);
+        if (targetPlayer) {
+            const targetCoins = getScore(targetPlayer, "dompet");
+            setScore(targetPlayer, "dompet", targetCoins + amount);
+            player.sendMessage(`§a[System] Berhasil mentransfer §e${formatRupiah(amount)} §ake §b${targetPlayer.name}§a (Online).`);
+            targetPlayer.sendMessage(`§a[System] Anda menerima §e${formatRupiah(amount)} §adari §b${player.name}§a.\nPesan: §7"${customMessage}"`);
+        }
+    });
+}
+
+function openOfflineTransferMenu(player) {
+    const form = new ModalFormData();
+    form.title("§c[ Transfer Offline ]");
+    form.textField("Nama Pemain Target (Harus Akurat):", "Ketik nama lengkap pemain");
     form.textField("Jumlah Rupiah:", "Contoh: 100000");
     form.textField("Pesan Tambahan (Opsional):", "Contoh: Bayar utang kemarin");
 
@@ -618,17 +694,14 @@ function openTransferMenu(player) {
 
         setScore(player, "dompet", currentCoins - amount);
 
-        // Attempt to find if player is online
         const targetPlayer = world.getAllPlayers().find(p => p.name === targetPlayerName);
 
         if (targetPlayer) {
-            // Online transfer
             const targetCoins = getScore(targetPlayer, "dompet");
             setScore(targetPlayer, "dompet", targetCoins + amount);
             player.sendMessage(`§a[System] Berhasil mentransfer §e${formatRupiah(amount)} §ake §b${targetPlayer.name}§a (Online).`);
             targetPlayer.sendMessage(`§a[System] Anda menerima §e${formatRupiah(amount)} §adari §b${player.name}§a.\nPesan: §7"${customMessage}"`);
         } else {
-            // Offline transfer
             sendToInbox(targetPlayerName, player.name, amount, customMessage);
             player.sendMessage(`§a[System] Berhasil mengirim §e${formatRupiah(amount)} §ake §b${targetPlayerName}§a (Offline).\nMereka akan menerimanya saat membuka Inbox.`);
         }

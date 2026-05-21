@@ -316,6 +316,7 @@ function openMainMenu(player) {
     form.button("§5§lGacha & Core\n§7Sihir Senjata & Pasif Dewa", "textures/blocks/enchanting_table_top");
     form.button("§4§lTroll Pemain\n§7Berikan kejutan ke pemain lain (Rp1 Juta)", "textures/blocks/tnt_side");
     form.button("§6§lSistem Pangkat\n§7Tingkatkan Rank & Diskon", "textures/items/nether_star");
+    form.button("§3§lTeleportasi & Home\n§7Navigasi Cepat (RTP)", "textures/items/compass_item");
 
     const unreadCount = getInbox(player.name).length;
     if (unreadCount > 0) {
@@ -355,6 +356,9 @@ function openMainMenu(player) {
                 import("./rank_system.js").then(mod => mod.openRankMenu(player)).catch(()=>{});
                 break;
             case 9:
+                import("./teleport_system.js").then(mod => mod.openTeleportMenu(player)).catch(()=>{});
+                break;
+            case 10:
                 openInboxMenu(player);
                 break;
         }
@@ -1155,11 +1159,15 @@ function executeWeaponEffect(effect, attacker, target) {
 
 // Global cooldown map for Second Wind
 const secondWindCooldowns = new Map();
+export const combatLogMap = new Map();
 
 // Hook into entityHurt (which triggers after damage is calculated but before death)
 world.afterEvents.entityHurt.subscribe((event) => {
     const target = event.hurtEntity;
     if (!target || target.typeId !== "minecraft:player") return;
+
+    // Tag player in combat to prevent teleport logging
+    combatLogMap.set(target.name, Date.now());
 
     const hpComp = target.getComponent("health");
     if (!hpComp) return;

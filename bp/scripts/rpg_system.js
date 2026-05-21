@@ -183,38 +183,41 @@ export function applyPassiveStats(player, rpgData) {
                 const legs = eqComponent.getEquipment("Legs");
                 const feet = eqComponent.getEquipment("Feet");
 
-                const checkEq = (item) => {
+                const checkEq = (item, slotName) => {
                     if (!item) return;
                     const eff = safeGet(item);
-                if (eff === "clear_mind") player.removeEffect("blindness");
-                if (eff === "aqua_lung") player.addEffect("water_breathing", 60, { amplifier: 0, showParticles: false });
-                if (eff === "third_eye") player.addEffect("night_vision", 300, { amplifier: 0, showParticles: false });
+                    if (eff === "clear_mind") player.removeEffect("blindness");
+                    if (eff === "aqua_lung") player.addEffect("water_breathing", 60, { amplifier: 0, showParticles: false });
+                    if (eff === "third_eye") player.addEffect("night_vision", 300, { amplifier: 0, showParticles: false });
 
-                if (eff === "iron_skin") player.addEffect("resistance", 30, { amplifier: 0, showParticles: false });
-                if (eff === "turtle_shell") {
-                    player.addEffect("resistance", 30, { amplifier: 1, showParticles: false });
-                    player.addEffect("slowness", 30, { amplifier: 0, showParticles: false });
-                }
-                if (eff === "troll_blood") {
-                    player.addEffect("regeneration", 60, { amplifier: 0, showParticles: false });
-                }
+                    if (eff === "iron_skin") player.addEffect("resistance", 30, { amplifier: 0, showParticles: false });
+                    if (eff === "turtle_shell") {
+                        player.addEffect("resistance", 30, { amplifier: 1, showParticles: false });
+                        player.addEffect("slowness", 30, { amplifier: 0, showParticles: false });
+                    }
+                    if (eff === "troll_blood") {
+                        player.addEffect("regeneration", 60, { amplifier: 0, showParticles: false });
+                    }
 
-                if (eff === "sturdy_legs") player.addEffect("health_boost", 30, { amplifier: 0, showParticles: false });
-                if (eff === "tank_legs") player.addEffect("health_boost", 30, { amplifier: 1, showParticles: false });
-                if (eff === "colossus") player.addEffect("health_boost", 30, { amplifier: 2, showParticles: false }); // Nerfed max to amp 2
+                    if (eff === "sturdy_legs") player.addEffect("health_boost", 30, { amplifier: 0, showParticles: false });
+                    if (eff === "tank_legs") player.addEffect("health_boost", 30, { amplifier: 1, showParticles: false });
+                    if (eff === "colossus") player.addEffect("health_boost", 30, { amplifier: 2, showParticles: false });
 
-                if (eff === "swift_step") player.addEffect("speed", 30, { amplifier: 0, showParticles: false });
-                if (eff === "frog_jump") player.addEffect("jump_boost", 30, { amplifier: 1, showParticles: false });
-                if (eff === "hermes_boots") {
-                    player.addEffect("speed", 30, { amplifier: 2, showParticles: false });
-                    player.addEffect("jump_boost", 30, { amplifier: 2, showParticles: false });
-                }
+                    if (eff === "swift_step") player.addEffect("speed", 30, { amplifier: 0, showParticles: false });
+                    if (eff === "frog_jump") player.addEffect("jump_boost", 30, { amplifier: 1, showParticles: false });
+                    if (eff === "hermes_boots") {
+                        player.addEffect("speed", 30, { amplifier: 2, showParticles: false });
+                        player.addEffect("jump_boost", 30, { amplifier: 2, showParticles: false });
+                    }
+
+                    // Commit recovered properties if needed
+                    eqComponent.setEquipment(slotName, item);
                 };
 
-                checkEq(head);
-                checkEq(chest);
-                checkEq(legs);
-                checkEq(feet);
+                checkEq(head, "Head");
+                checkEq(chest, "Chest");
+                checkEq(legs, "Legs");
+                checkEq(feet, "Feet");
             }
 
             if (invComponent && invComponent.container) {
@@ -224,6 +227,8 @@ export function applyPassiveStats(player, rpgData) {
                     if (eff === "miner_touch") player.addEffect("haste", 30, { amplifier: 0, showParticles: false });
                     if (eff === "geo_master") player.addEffect("haste", 30, { amplifier: 1, showParticles: false });
                     if (eff === "god_breaker") player.addEffect("haste", 30, { amplifier: 3, showParticles: false });
+
+                    invComponent.container.setItem(player.selectedSlotIndex, mainHand);
                 }
             }
         }).catch(() => {});

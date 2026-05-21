@@ -332,7 +332,7 @@ function openMainMenu(player) {
                 openBuyMenu(player);
                 break;
             case 1:
-                processSellAll(player);
+                openSellChoiceMenu(player);
                 break;
             case 2:
                 openTransferMenu(player);
@@ -1088,6 +1088,11 @@ world.afterEvents.entityHitEntity.subscribe((event) => {
         if (!effect || typeof effect !== 'string' || effect === "none") return;
 
         executeWeaponEffect(effect, attacker, target);
+
+        // Note: The safeGetGachaEffect sets the property back onto the item instance in memory,
+        // but to permanently save it to the container if it was missing, we must rewrite it to the slot.
+        // We do this silently here to ensure the player's weapon fully recovers its properties.
+        inv.setItem(selectedSlot, item);
     }).catch(() => {});
 });
 
@@ -1200,3 +1205,113 @@ world.afterEvents.entityHurt.subscribe((event) => {
         }
     }
 });
+
+function openSellChoiceMenu(player) {
+    const form = new ActionFormData();
+    form.title("§1[ Menu Jual Barang ]");
+    form.body(`${getUiHeader(player)}\n§7Pilih metode penjualan barang langka Anda.`);
+    form.button("§aJual Semua (Auto-Scan)\n§7Otomatis jual semua barang langka", "textures/ui/refresh_light");
+    form.button("§ePilih Manual (Manual-Scan)\n§7Pilih barang yang ingin dijual", "textures/ui/inventory_icon");
+    form.button("§cKembali ke Menu Utama", "textures/ui/cancel");
+
+    form.show(player).then(res => {
+        if (res.canceled) return;
+        if (res.selection === 0) {
+            processSellAll(player);
+        } else if (res.selection === 1) {
+            openManualSellMenu(player);
+        } else if (res.selection === 2) {
+            openMainMenu(player);
+        }
+    });
+}
+
+function openManualSellMenu(player) {
+    const inventoryComponent = player.getComponent("inventory");
+    if (!inventoryComponent) return;
+    const inventory = inventoryComponent.container;
+    if (!inventory) return;
+
+    // Aggregate sellable items from main inventory (0-35)
+    // We group them by typeId to make the UI cleaner
+    const sellableMap = new Map();
+
+    for (let i = 0; i < 36; i++) {
+        const item = inventory.getItem(i);
+        if (!item) continue;
+
+        if (item.typeId === "minecraft:clock" && item.nameTag === "§e§lMenu Utama") continue;
+        if (item.typeId === "minecraft:book" && item.nameTag === "§a§lBuku Panduan") continue;
+
+        const sellPrice = EconomyConfig.sellPrices[item.typeId];
+        if (sellPrice !== undefined) {
+            const currentAmount = sellableMap.get(item.typeId) || 0;
+            sellableMap.set(item.typeId, currentAmount + item.amount);
+        }
+    }
+
+    if (sellableMap.size === 0) {
+        player.sendMessage("§c[Shop] Tidak ada barang langka yang dapat dijual di dalam Inventory.");
+        return;
+    }
+
+    const form = new ModalFormData();
+    form.title("§1[ Jual Manual ]");
+
+    // Convert map to array for predictable iteration
+    const sellableList = Array.from(sellableMap.entries()).map(([typeId, amount]) => {
+        return { typeId, totalAmount: amount, price: EconomyConfig.sellPrices[typeId] };
+    });
+
+    for (const data of sellableList) {
+        const displayName = formatItemName(data.typeId);
+        form.slider(`Jual §e${displayName} §f(Maks: ${data.totalAmount})\n§7Harga Satuan: ${formatRupiah(data.price)}`, 0, data.totalAmount, 1, 0);
+    }
+
+    form.show(player).then(res => {
+        if (res.canceled) return;
+
+        let totalEarned = 0;
+        let itemsSold = false;
+
+        // Process deduction
+        for (let i = 0; i < sellableList.length; i++) {
+            const amountToSell = Math.floor(res.formValues[i]);
+            if (amountToSell > 0) {
+                const data = sellableList[i];
+                totalEarned += (amountToSell * data.price);
+                itemsSold = true;
+
+                // Deduct exactly 'amountToSell' from the inventory
+                let remainingToRemove = amountToSell;
+                for (let slot = 0; slot < 36; slot++) {
+                    if (remainingToRemove <= 0) break;
+
+                    const item = inventory.getItem(slot);
+                    if (item && item.typeId === data.typeId) {
+                        // Ensure we don't accidentally remove the Menu Utama if it shares an ID (unlikely, but safe)
+                        if (item.typeId === "minecraft:clock" && item.nameTag === "§e§lMenu Utama") continue;
+                        if (item.typeId === "minecraft:book" && item.nameTag === "§a§lBuku Panduan") continue;
+
+                        if (item.amount <= remainingToRemove) {
+                            remainingToRemove -= item.amount;
+                            inventory.setItem(slot, undefined); // clear slot
+                        } else {
+                            item.amount -= remainingToRemove;
+                            inventory.setItem(slot, item);
+                            remainingToRemove = 0;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (itemsSold) {
+            const currentCoins = getScore(player, "dompet");
+            setScore(player, "dompet", currentCoins + totalEarned);
+            player.sendMessage(`§a[Shop] Berhasil menjual barang pilihan! Total didapat: §e${formatRupiah(totalEarned)}`);
+        } else {
+            player.sendMessage("§e[Shop] Anda membatalkan penjualan (0 item dipilih).");
+        }
+    });
+}

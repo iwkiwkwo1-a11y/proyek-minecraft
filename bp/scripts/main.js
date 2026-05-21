@@ -5,6 +5,7 @@ import { getPlayerRpgData, getXpRequired, generateXpBar, applyPassiveStats, addX
 import { formatRupiah } from "./utils.js";
 import { openGachaMenu, PASSIVE_POOL } from "./gacha_system.js";
 import { openTrollMenu } from "./troll_system.js";
+import { getPlayerRank } from "./rank_system.js";
 
 // Initialize Objective
 system.run(() => {
@@ -117,8 +118,15 @@ system.runInterval(() => {
             for (let i = 0; i < maxDisplay; i++) {
                 const sInfo = scores[i];
                 const displayName = sInfo.participant.displayName;
+
+                let badge = "§7[Warga Biasa]"; // fallback
+                const pTarget = world.getAllPlayers().find(p => p.name === displayName);
+                if (pTarget) {
+                    badge = getPlayerRank(pTarget).badge;
+                }
+
                 // Add invisible formatting codes to prevent duplicate name errors
-                const rankName = `§f${i + 1}. §b${displayName}${"§r".repeat(i)}`;
+                const rankName = `§f${i + 1}. ${badge} §b${displayName}${"§r".repeat(i)}`;
                 freshTop.setScore(rankName, sInfo.score);
             }
         }
@@ -133,9 +141,10 @@ system.runInterval(() => {
 
         if (hiddenBoards.get(player.name)) continue;
 
+        const rankBadge = getPlayerRank(player).badge;
         const score = getScore(player, "dompet");
         const coreScore = getScore(player, "core");
-        let actionbarText = `§e§lDOMPET: §f${formatRupiah(score)} §8| §b§lCORE: §f${coreScore} §8| §aOnline: ${online}`;
+        let actionbarText = `${rankBadge} §e§lDOMPET: §f${formatRupiah(score)} §8| §b§lCORE: §f${coreScore} §8| §aOnline: ${online}`;
 
         // Check if player earned XP recently (within last 3 seconds)
         try {
@@ -300,6 +309,7 @@ function openMainMenu(player) {
     form.button("§d§lMenu RPG & Skill\n§7Level & Kemampuan Aktif");
     form.button("§5§lGacha & Core\n§7Sihir Senjata & Pasif Dewa");
     form.button("§4§lTroll Pemain\n§7Berikan kejutan ke pemain lain (Rp1 Juta)");
+    form.button("§6§lSistem Pangkat\n§7Tingkatkan Rank & Diskon");
 
     form.show(player).then((response) => {
         if (response.canceled) return;
@@ -328,16 +338,21 @@ function openMainMenu(player) {
             case 7:
                 openTrollMenu(player);
                 break;
+            case 8:
+                import("./rank_system.js").then(mod => mod.openRankMenu(player)).catch(()=>{});
+                break;
         }
     });
 }
 
 function openRpgMenu(player) {
     const rpgData = getPlayerRpgData(player);
+    const pRank = getPlayerRank(player);
     const form = new ActionFormData();
     form.title("§d[ Profil RPG & Skill ]");
 
-    let statsStr = `§fSkill Points (SP): §e${rpgData.sp}\n`;
+    let statsStr = `Pangkat Anda: ${pRank.badge}\n\n`;
+    statsStr += `§fSkill Points (SP): §e${rpgData.sp}\n`;
     statsStr += `\n§e⛏ Mining: §fLv.${rpgData.mining.level} §7(${rpgData.mining.xp}/${getXpRequired(rpgData.mining.level)} XP)\n`;
     statsStr += `§a🪓 Woodcutting: §fLv.${rpgData.woodcutting.level} §7(${rpgData.woodcutting.xp}/${getXpRequired(rpgData.woodcutting.level)} XP)\n`;
     statsStr += `§c⚔ Slayer: §fLv.${rpgData.slayer.level} §7(${rpgData.slayer.xp}/${getXpRequired(rpgData.slayer.level)} XP)\n`;
@@ -386,9 +401,9 @@ function openRpgMenu(player) {
 }
 
 const AVAILABLE_SKILLS = [
-    { id: "ore_excavation", name: "⛏ Ore Excavation (Mining)", desc: "Hancurkan 3x3x3 blok batu/ore sekaligus dengan jongkok.", cost: 15 },
-    { id: "lumberjacks_sweep", name: "🪓 Lumberjack's Sweep (Woodcutting)", desc: "Tebang 3x3x3 blok kayu sekaligus dengan jongkok.", cost: 15 },
-    { id: "siphon_strike", name: "⚔ Siphon Strike (Slayer)", desc: "Menyembuhkan HP saat membunuh monster dengan jongkok.", cost: 20 }
+    { id: "ore_excavation", name: "⛏ Ore Excavation (Mining)", desc: "Hancurkan 3x3x3 blok batu/ore sekaligus saat fitur dinyalakan.", cost: 15 },
+    { id: "lumberjacks_sweep", name: "🪓 Lumberjack's Sweep (Woodcutting)", desc: "Tebang 3x3x3 blok kayu sekaligus saat fitur dinyalakan.", cost: 15 },
+    { id: "siphon_strike", name: "⚔ Siphon Strike (Slayer)", desc: "Menyembuhkan HP saat membunuh monster saat fitur dinyalakan.", cost: 20 }
 ];
 
 function openSkillTreeMenu(player) {
@@ -883,19 +898,27 @@ function openBuyMenu(player, page = 0) {
 function openBuyAmountMenu(player, itemData) {
     const form = new ModalFormData();
     const displayName = formatItemName(itemData.id);
-    const priceStr = formatRupiah(itemData.price);
+
+    const pRank = getPlayerRank(player);
+    const rawPrice = itemData.price;
+    const discountedPrice = Math.floor(rawPrice * (1 - pRank.discount));
+
+    let priceText = `§7Harga Normal: §c${formatRupiah(rawPrice)}§r\n`;
+    if (pRank.discount > 0) {
+        priceText += `§7Diskon Pangkat (${pRank.badge}§7): §a${formatRupiah(discountedPrice)}§r\n`;
+    }
 
     form.title("§a[ Beli Barang ]");
-    form.slider(`Tentukan jumlah §e${displayName} §fyang ingin kamu beli?\n§7Harga Satuan: ${priceStr}`, 1, 64, 1, 1);
+    form.slider(`Tentukan jumlah §e${displayName} §fyang ingin dibeli:\n\n${priceText}`, 1, 64, 1, 1);
 
     form.show(player).then((response) => {
         if (response.canceled) return;
 
         const amount = Math.floor(response.formValues[0]);
-        const totalCost = itemData.price * amount;
+        const finalCost = discountedPrice * amount;
         const currentCoins = getScore(player, "dompet");
 
-        if (currentCoins >= totalCost) {
+        if (currentCoins >= finalCost) {
             const invComponent = player.getComponent("inventory");
             if (!invComponent || !invComponent.container) {
                 player.sendMessage("§c[Shop] Gagal mengakses Inventory Anda!");
@@ -907,11 +930,11 @@ function openBuyAmountMenu(player, itemData) {
 
             // Hard check to prevent dropping items as entities and lagging the server
             if (invComponent.container.emptySlotsCount < slotsNeeded) {
-                player.sendMessage(`§c[Shop] Inventory Anda tidak memiliki cukup ruang! DiperAndakan ${slotsNeeded} slot kosong.`);
+                player.sendMessage(`§c[Shop] Inventory Anda tidak memiliki cukup ruang! Diperlukan ${slotsNeeded} slot kosong.`);
                 return;
             }
 
-            setScore(player, "dompet", currentCoins - totalCost);
+            setScore(player, "dompet", currentCoins - finalCost);
 
             let remaining = amount;
             while (remaining > 0) {
@@ -924,9 +947,9 @@ function openBuyAmountMenu(player, itemData) {
                 remaining -= toGive;
             }
 
-            player.sendMessage(`§a[Shop] Sukses membeli §e${amount}x ${displayName} §aseharga §e${formatRupiah(totalCost)}!`);
+            player.sendMessage(`§a[Shop] Berhasil membeli §e${amount}x ${displayName} §aseharga §e${formatRupiah(finalCost)}!`);
         } else {
-            player.sendMessage(`§c[Shop] Saldo Rupiah Anda tidak mencukupi. DiperAndakan ${formatRupiah(totalCost)}.`);
+            player.sendMessage(`§c[Shop] Saldo Rupiah Anda tidak mencukupi. Diperlukan ${formatRupiah(finalCost)}.`);
         }
     });
 }

@@ -1,6 +1,6 @@
 import { world, system } from "@minecraft/server";
 import { ActionFormData } from "@minecraft/server-ui";
-import { formatRupiah } from "./utils.js";
+import { formatRupiah, getUiHeader } from "./utils.js";
 
 // Rank definitions from lowest (index 0) to highest
 export const RANKS = [
@@ -34,7 +34,7 @@ export function openRankMenu(player) {
 
     form.title("§6[ Sistem Pangkat ]");
 
-    let bodyText = `Pangkat Anda saat ini: ${currentRank.badge}\n`;
+    let bodyText = getUiHeader(player);
     bodyText += `Diskon Toko Dinamis: §a${currentRank.discount * 100}%§r\n\n`;
 
     const nextRank = RANKS[currentRank.id + 1];

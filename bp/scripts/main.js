@@ -2,7 +2,7 @@ import { world, system, ItemStack, ItemLockMode, EnchantmentTypes, DisplaySlotId
 import { ActionFormData, ModalFormData } from "@minecraft/server-ui";
 import { EconomyConfig } from "./economy_config.js";
 import { getPlayerRpgData, getXpRequired, generateXpBar, applyPassiveStats, addXp, breakBlockArea, canUseActiveSkill, savePlayerRpgData } from "./rpg_system.js";
-import { formatRupiah } from "./utils.js";
+import { formatRupiah, getUiHeader, sendToInbox, getInbox, clearInbox } from "./utils.js";
 import { openGachaMenu, PASSIVE_POOL } from "./gacha_system.js";
 import { openTrollMenu } from "./troll_system.js";
 import { getPlayerRank } from "./rank_system.js";
@@ -186,77 +186,78 @@ system.afterEvents.scriptEventReceive.subscribe((event) => {
     }
 }, { namespaces: ["ekonomi"] });
 
-// Give Shop Clock and Guide Book on Spawn
+// Give Shop Clock and Starter Pack on Spawn
 world.afterEvents.playerSpawn.subscribe((event) => {
     const player = event.player;
 
-    // Only give initial items if this is the player's first time spawning (or respawning without the items)
-    // In a real server, we might want to track first join using tags, but checking for the item works for returning it if lost.
     system.runTimeout(() => {
-        const inventoryComponent = player.getComponent("inventory");
-        if (!inventoryComponent) return;
-        const inventory = inventoryComponent.container;
-        if (!inventory) return;
+        // 1. Give Welcome Screen and Starter Pack if New Player
+        if (!player.hasTag("has_received_guide")) {
+            const form = new ActionFormData();
+            form.title("§e§lWelcome to PRO SURVIVAL");
+            form.body("§fSelamat datang di server! Server ini memiliki sistem Ekonomi, Gacha, dan RPG yang sangat seru.\n\nAmbil Starter Pack Anda di bawah ini untuk memulai petualangan!");
+            form.button("§aAmbil Starter Pack\n§7Rp10.000 + 5 Roti", "textures/items/diamond");
 
-        let hasShop = false;
-        let hasGuideBook = false;
+            form.show(player).then(res => {
+                player.addTag("has_received_guide"); // Prevent looping
 
-        // Search all slots for the shop clock and guide book
-        for (let i = 0; i < inventory.size; i++) {
-            const item = inventory.getItem(i);
-            if (item) {
-                if (item.typeId === "minecraft:clock" && item.nameTag === "§e§lMenu Utama") hasShop = true;
-                if (item.typeId === "minecraft:book" && item.nameTag === "§a§lBuku Panduan") hasGuideBook = true;
-            }
+                // Give Starter Pack items
+                player.runCommandAsync("give @s minecraft:bread 5");
+                const currentCoins = getScore(player, "dompet");
+                setScore(player, "dompet", currentCoins + 10000);
+
+                player.sendMessage("§a[System] Anda mendapatkan Starter Pack! Selamat bermain!");
+                grantMenuClock(player);
+            }).catch(e => {
+                // If UI closed by accident, just give the items
+                player.addTag("has_received_guide");
+                player.runCommandAsync("give @s minecraft:bread 5");
+                const currentCoins = getScore(player, "dompet");
+                setScore(player, "dompet", currentCoins + 10000);
+                grantMenuClock(player);
+            });
+        } else {
+            // Returning player, just ensure they have the clock
+            grantMenuClock(player);
+        }
+    }, 20);
+});
+
+function grantMenuClock(player) {
+    const inventoryComponent = player.getComponent("inventory");
+    if (!inventoryComponent) return;
+    const inventory = inventoryComponent.container;
+    if (!inventory) return;
+
+    let hasShop = false;
+    for (let i = 0; i < inventory.size; i++) {
+        const item = inventory.getItem(i);
+        if (item && item.typeId === "minecraft:clock" && item.nameTag === "§e§lMenu Utama") {
+            hasShop = true;
+            break;
+        }
+    }
+
+    if (!hasShop) {
+        const clock = new ItemStack("minecraft:clock", 1);
+        clock.nameTag = "§e§lMenu Utama";
+
+        if (typeof ItemLockMode !== 'undefined' && ItemLockMode.inventory) {
+            clock.lockMode = ItemLockMode.inventory;
+        } else {
+            clock.lockMode = "inventory";
         }
 
-        if (!hasShop) {
-            const clock = new ItemStack("minecraft:clock", 1);
-            clock.nameTag = "§e§lMenu Utama";
-
-            // Set lock mode to prevent dropping
-            if (typeof ItemLockMode !== 'undefined' && ItemLockMode.inventory) {
-                clock.lockMode = ItemLockMode.inventory;
-            } else {
-                clock.lockMode = "inventory";
+        try {
+            const enchantable = clock.getComponent("enchantable") || clock.getComponent("minecraft:enchantable");
+            if (enchantable) {
+                const unbreakingType = EnchantmentTypes.get("unbreaking");
+                if (unbreakingType) enchantable.addEnchantment({ type: unbreakingType, level: 1 });
             }
+        } catch (e) {}
 
-            // Attempt to add unbreaking 1 for glow
-            try {
-                const enchantable = clock.getComponent("enchantable") || clock.getComponent("minecraft:enchantable");
-                if (enchantable) {
-                    const unbreakingType = EnchantmentTypes.get("unbreaking");
-                    if (unbreakingType) {
-                        enchantable.addEnchantment({ type: unbreakingType, level: 1 });
-                    }
-                }
-            } catch (e) {}
-
-            const slot8Item = inventory.getItem(8);
-            if (slot8Item) {
-                let emptySlot = -1;
-                for (let i = 0; i < 36; i++) {
-                    if (!inventory.getItem(i)) {
-                        emptySlot = i;
-                        break;
-                    }
-                }
-
-                if (emptySlot !== -1) {
-                    inventory.setItem(emptySlot, slot8Item);
-                    inventory.setItem(8, clock);
-                } else {
-                    player.sendMessage("§c[System] Inventory Anda penuh. Gagal memberikan Jam Menu Utama.");
-                }
-            } else {
-                inventory.setItem(8, clock);
-            }
-        }
-
-        if (!hasGuideBook && !player.hasTag("has_received_guide")) {
-            const book = new ItemStack("minecraft:book", 1);
-            book.nameTag = "§a§lBuku Panduan";
-
+        const slot8Item = inventory.getItem(8);
+        if (slot8Item) {
             let emptySlot = -1;
             for (let i = 0; i < 36; i++) {
                 if (!inventory.getItem(i)) {
@@ -264,13 +265,18 @@ world.afterEvents.playerSpawn.subscribe((event) => {
                     break;
                 }
             }
+
             if (emptySlot !== -1) {
-                inventory.setItem(emptySlot, book);
-                player.addTag("has_received_guide");
+                inventory.setItem(emptySlot, slot8Item);
+                inventory.setItem(8, clock);
+            } else {
+                player.sendMessage("§c[System] Inventory Anda penuh. Gagal memberikan Jam Menu Utama.");
             }
+        } else {
+            inventory.setItem(8, clock);
         }
-    }, 10);
-});
+    }
+}
 
 // Open Menu / Guidebook on Item Use
 world.beforeEvents.itemUse.subscribe((event) => {
@@ -301,15 +307,22 @@ function openGuideBook(player) {
 function openMainMenu(player) {
     const form = new ActionFormData();
     form.title("§1[ Server Menu Utama ]");
-    form.button("§e§lMenu Beli Barang\n§7Klik untuk beli kebutuhan");
-    form.button("§a§lMenu Jual Barang\n§7Pindah & Filter Rupiah");
-    form.button("§b§lTransfer Rupiah\n§7Kirim Rupiah ke pemain lain");
-    form.button("§c§lSistem Bounty\n§7Pasang buronan");
-    form.button("§6§lTop Sultan\n§7Peringkat pemain terkaya");
-    form.button("§d§lMenu RPG & Skill\n§7Level & Kemampuan Aktif");
-    form.button("§5§lGacha & Core\n§7Sihir Senjata & Pasif Dewa");
-    form.button("§4§lTroll Pemain\n§7Berikan kejutan ke pemain lain (Rp1 Juta)");
-    form.button("§6§lSistem Pangkat\n§7Tingkatkan Rank & Diskon");
+    form.button("§e§lMenu Beli Barang\n§7Klik untuk beli kebutuhan", "textures/items/emerald");
+    form.button("§a§lMenu Jual Barang\n§7Pindah & Filter Rupiah", "textures/items/gold_ingot");
+    form.button("§b§lTransfer Rupiah\n§7Kirim Rupiah ke pemain lain", "textures/items/paper");
+    form.button("§c§lSistem Bounty\n§7Pasang buronan", "textures/items/iron_sword");
+    form.button("§6§lTop Sultan\n§7Peringkat pemain terkaya", "textures/items/diamond");
+    form.button("§d§lMenu RPG & Skill\n§7Level & Kemampuan Aktif", "textures/items/diamond_sword");
+    form.button("§5§lGacha & Core\n§7Sihir Senjata & Pasif Dewa", "textures/blocks/enchanting_table_top");
+    form.button("§4§lTroll Pemain\n§7Berikan kejutan ke pemain lain (Rp1 Juta)", "textures/blocks/tnt_side");
+    form.button("§6§lSistem Pangkat\n§7Tingkatkan Rank & Diskon", "textures/items/nether_star");
+
+    const unreadCount = getInbox(player.name).length;
+    if (unreadCount > 0) {
+        form.button(`§e§lPesan Masuk (${unreadCount})\n§7Ambil kiriman Rupiah`, "textures/items/book_writable");
+    } else {
+        form.button(`§7Pesan Masuk (0)\n§7Tidak ada pesan`, "textures/items/book_normal");
+    }
 
     form.show(player).then((response) => {
         if (response.canceled) return;
@@ -341,6 +354,47 @@ function openMainMenu(player) {
             case 8:
                 import("./rank_system.js").then(mod => mod.openRankMenu(player)).catch(()=>{});
                 break;
+            case 9:
+                openInboxMenu(player);
+                break;
+        }
+    });
+}
+
+function openInboxMenu(player) {
+    const inbox = getInbox(player.name);
+    const form = new ActionFormData();
+    form.title("§e[ Pesan Masuk ]");
+
+    if (inbox.length === 0) {
+        form.body(`${getUiHeader(player)}\n§7Kotak masuk Anda kosong.`);
+        form.button("§cKembali");
+        form.show(player).then(() => openMainMenu(player));
+        return;
+    }
+
+    let totalClaimed = 0;
+    let bodyText = `${getUiHeader(player)}\n§aPesan Baru:\n\n`;
+
+    for (const msg of inbox) {
+        const date = new Date(msg.timestamp);
+        const timeStr = `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+        bodyText += `§f[${timeStr}] Dari §b${msg.sender}§f:\n§7"${msg.message}"\n§e+${formatRupiah(msg.amount)}\n\n`;
+        totalClaimed += msg.amount;
+    }
+
+    bodyText += `§a--------------------\n§fTotal Diterima: §e${formatRupiah(totalClaimed)}`;
+    form.body(bodyText);
+    form.button(`§aKlaim Semua (${formatRupiah(totalClaimed)})`, "textures/items/emerald");
+    form.button("§cTutup");
+
+    form.show(player).then((res) => {
+        if (res.canceled) return;
+        if (res.selection === 0) {
+            const currentCoins = getScore(player, "dompet");
+            setScore(player, "dompet", currentCoins + totalClaimed);
+            clearInbox(player.name);
+            player.sendMessage(`§a[System] Berhasil mengklaim ${formatRupiah(totalClaimed)} dari Inbox!`);
         }
     });
 }
@@ -524,24 +578,24 @@ function openEquipUnifiedMenu(player) {
 
 
 function openTransferMenu(player) {
-    const onlinePlayers = world.getAllPlayers().filter(p => p.name !== player.name);
-    if (onlinePlayers.length === 0) {
-        player.sendMessage("§c[System] Tidak ada pemain lain yang online untuk ditransfer.");
-        return;
-    }
-
-    const playerNames = onlinePlayers.map(p => p.name);
     const form = new ModalFormData();
     form.title("§b[ Transfer Rupiah ]");
-    form.dropdown("Pilih Pemain:", playerNames);
-    form.textField("Jumlah Rupiah:", "Contoh: 100");
+    form.textField("Nama Pemain Target (Bisa Offline):", "Ketik nama lengkap pemain");
+    form.textField("Jumlah Rupiah:", "Contoh: 100000");
+    form.textField("Pesan Tambahan (Opsional):", "Contoh: Bayar utang kemarin");
 
     form.show(player).then((response) => {
         if (response.canceled) return;
 
-        const targetIndex = response.formValues[0];
+        const targetPlayerName = response.formValues[0].trim();
         const amountStr = response.formValues[1];
         const amount = parseInt(amountStr);
+        const customMessage = response.formValues[2].trim() || "Transfer dari teman";
+
+        if (!targetPlayerName) {
+            player.sendMessage("§c[System] Nama target tidak boleh kosong!");
+            return;
+        }
 
         if (isNaN(amount) || amount <= 0) {
             player.sendMessage("§c[System] Jumlah Rupiah tidak valid!");
@@ -554,20 +608,22 @@ function openTransferMenu(player) {
             return;
         }
 
-        const targetPlayerName = playerNames[targetIndex];
+        setScore(player, "dompet", currentCoins - amount);
+
+        // Attempt to find if player is online
         const targetPlayer = world.getAllPlayers().find(p => p.name === targetPlayerName);
 
-        if (!targetPlayer) {
-            player.sendMessage("§c[System] Pemain target tidak ditemukan atau sudah offline.");
-            return;
+        if (targetPlayer) {
+            // Online transfer
+            const targetCoins = getScore(targetPlayer, "dompet");
+            setScore(targetPlayer, "dompet", targetCoins + amount);
+            player.sendMessage(`§a[System] Berhasil mentransfer §e${formatRupiah(amount)} §ake §b${targetPlayer.name}§a (Online).`);
+            targetPlayer.sendMessage(`§a[System] Anda menerima §e${formatRupiah(amount)} §adari §b${player.name}§a.\nPesan: §7"${customMessage}"`);
+        } else {
+            // Offline transfer
+            sendToInbox(targetPlayerName, player.name, amount, customMessage);
+            player.sendMessage(`§a[System] Berhasil mengirim §e${formatRupiah(amount)} §ake §b${targetPlayerName}§a (Offline).\nMereka akan menerimanya saat membuka Inbox.`);
         }
-
-        setScore(player, "dompet", currentCoins - amount);
-        const targetCoins = getScore(targetPlayer, "dompet");
-        setScore(targetPlayer, "dompet", targetCoins + amount);
-
-        player.sendMessage(`§a[System] Berhasil mentransfer §e${formatRupiah(amount)} §ake §b${targetPlayer.name}§a.`);
-        targetPlayer.sendMessage(`§a[System] Kamu menerima §e${formatRupiah(amount)} §adari §b${player.name}§a.`);
     });
 }
 
@@ -844,7 +900,7 @@ function openBuyMenu(player, page = 0) {
 
     const form = new ActionFormData();
     form.title(`§1[ Toko Dinamis | Halaman ${page + 1}/${totalPages} ]`);
-    form.body(`§eSisa Waktu Refresh: §f${secondsLeft} detik\n§7Barang-barang ini akan berubah secara acak!`);
+    form.body(`${getUiHeader(player)}\n§eSisa Waktu Refresh: §f${secondsLeft} detik\n§7Barang-barang ini akan berubah secara acak!`);
 
     for (const item of pageItems) {
         const displayName = formatItemName(item.id);

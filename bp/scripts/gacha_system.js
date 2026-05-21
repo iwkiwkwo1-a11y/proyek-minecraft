@@ -1,7 +1,7 @@
 import { world, system, ItemStack } from "@minecraft/server";
 import { ActionFormData, ModalFormData, MessageFormData } from "@minecraft/server-ui";
 import { getPlayerRpgData, savePlayerRpgData } from "./rpg_system.js";
-import { formatRupiah } from "./utils.js";
+import { formatRupiah, getUiHeader } from "./utils.js";
 import { getItemCategory, getEffectPool } from "./gacha_effects.js";
 
 // Constants
@@ -29,8 +29,7 @@ export function openGachaMenu(player) {
     const form = new ActionFormData();
     form.title("§5[ Gacha & Core ]");
 
-    const coreCount = getCoreScore(player);
-    form.body(`§fMata Uang Core: §b${coreCount} Core\n\n§7Gunakan Core untuk menggacha kekuatan senjata legendaris atau mendapatkan skill pasif tingkat dewa!`);
+    form.body(getUiHeader(player) + `\n§7Gunakan Core untuk menggacha kekuatan senjata legendaris atau mendapatkan skill pasif tingkat dewa!`);
 
     form.button("§bTukar Rupiah -> Core\n§7Rp100.000 = 1 Core");
     form.button("§dGacha Senjata/Armor (Main Hand)\n§7Harga: 5 Core");

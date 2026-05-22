@@ -1,7 +1,6 @@
 import { world, system } from "@minecraft/server";
 import { ActionFormData, ModalFormData } from "@minecraft/server-ui";
-import { getScore, setScore } from "./main.js";
-import { formatRupiah, getUiHeader } from "./utils.js";
+import { formatRupiah, getUiHeader, getScore, setScore } from "./utils.js";
 
 // Konfigurasi Land Claim
 const CHUNK_PRICE = 500000;

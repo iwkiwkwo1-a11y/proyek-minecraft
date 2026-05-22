@@ -2,7 +2,7 @@ import { world, system, ItemStack, ItemLockMode, EnchantmentTypes, DisplaySlotId
 import { ActionFormData, ModalFormData } from "@minecraft/server-ui";
 import { EconomyConfig } from "./economy_config.js";
 import { getPlayerRpgData, getXpRequired, generateXpBar, applyPassiveStats, addXp, breakBlockArea, canUseActiveSkill, savePlayerRpgData } from "./rpg_system.js";
-import { formatRupiah, getUiHeader, sendToInbox, getInbox, clearInbox } from "./utils.js";
+import { formatRupiah, getUiHeader, sendToInbox, getInbox, clearInbox, getScore, setScore } from "./utils.js";
 import { openGachaMenu, PASSIVE_POOL } from "./gacha_system.js";
 import { openTrollMenu } from "./troll_system.js";
 import { getPlayerRank } from "./rank_system.js";
@@ -71,23 +71,6 @@ system.runInterval(() => {
         world.sendMessage("§e[Shop] §fBarang jualan di Menu Beli telah diperbarui! Cek sekarang!");
     }
 }, 20);
-
-export function getScore(player, objectiveId) {
-    const obj = world.scoreboard.getObjective(objectiveId);
-    if (!obj) return 0;
-    try {
-        return obj.getScore(player.scoreboardIdentity) || 0;
-    } catch {
-        return 0;
-    }
-}
-
-export function setScore(player, objectiveId, score) {
-    const obj = world.scoreboard.getObjective(objectiveId);
-    if (obj) {
-        obj.setScore(player, score);
-    }
-}
 
 // Actionbar Loop & Visibility Tracker
 const hiddenBoards = new Map();

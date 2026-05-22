@@ -6,6 +6,7 @@ import { formatRupiah, getUiHeader, sendToInbox, getInbox, clearInbox } from "./
 import { openGachaMenu, PASSIVE_POOL } from "./gacha_system.js";
 import { openTrollMenu } from "./troll_system.js";
 import { getPlayerRank } from "./rank_system.js";
+import "./land_system.js"; // Import static agar beforeEvents teregistrasi sejak awal
 
 // Initialize Objective
 system.run(() => {
@@ -71,7 +72,7 @@ system.runInterval(() => {
     }
 }, 20);
 
-function getScore(player, objectiveId) {
+export function getScore(player, objectiveId) {
     const obj = world.scoreboard.getObjective(objectiveId);
     if (!obj) return 0;
     try {
@@ -81,7 +82,7 @@ function getScore(player, objectiveId) {
     }
 }
 
-function setScore(player, objectiveId, score) {
+export function setScore(player, objectiveId, score) {
     const obj = world.scoreboard.getObjective(objectiveId);
     if (obj) {
         obj.setScore(player, score);
@@ -319,7 +320,7 @@ function openGuideBook(player) {
 }
 
 // UI Logic - Main Menu
-function openMainMenu(player) {
+export function openMainMenu(player) {
     const form = new ActionFormData();
     form.title("§1[ Server Menu Utama ]");
     form.button("§e§lMenu Beli Barang\n§7Klik untuk beli kebutuhan", "textures/items/emerald");
@@ -332,6 +333,7 @@ function openMainMenu(player) {
     form.button("§4§lTroll Pemain\n§7Berikan kejutan ke pemain lain (Rp1 Juta)", "textures/blocks/tnt_side");
     form.button("§6§lSistem Pangkat\n§7Tingkatkan Rank & Diskon", "textures/items/nether_star");
     form.button("§3§lTeleportasi & Home\n§7Navigasi Cepat (RTP)", "textures/items/compass_item");
+    form.button("§2§lKlaim Tanah\n§7Proteksi rumah (Anti-Grief)", "textures/items/diamond_hoe");
 
     const unreadCount = getInbox(player.name).length;
     if (unreadCount > 0) {
@@ -374,6 +376,9 @@ function openMainMenu(player) {
                 import("./teleport_system.js").then(mod => mod.openTeleportMenu(player)).catch(()=>{});
                 break;
             case 10:
+                import("./land_system.js").then(mod => mod.openLandMenu(player)).catch(()=>{});
+                break;
+            case 11:
                 openInboxMenu(player);
                 break;
         }
